@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in | SwiftRide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main class="screen">
+  <h1>Welcome back</h1>
+  <p class="sub">Sign in to keep riding</p>
+  <p id="msg" class="msg err" hidden role="alert"></p>
+  <form id="form" style="display:flex;flex-direction:column;gap:14px" novalidate>
+    <label>Email address<input id="email" type="email" placeholder="you@gmail.com" autocomplete="email" required></label>
+    <label>Password<input id="password" type="password" placeholder="Your password" autocomplete="current-password" required></label>
+    <button id="go" class="btn" type="submit">Sign in</button>
+  </form>
+  <a class="link" href="signup.html">New here? Create an account</a>
+</main>
+<script type="module">
+import { supabase, getProfile, pageForRole, showMessage } from './js/common.js';
+const msg = document.getElementById('msg');
+if (new URLSearchParams(location.search).get('blocked')) showMessage(msg, 'This account has been blocked. Please contact support.');
+document.getElementById('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim().toLowerCase();
+  const password = document.getElementById('password').value;
+  if (!email || !password) return showMessage(msg, 'Please enter your email and password.');
+  const btn = document.getElementById('go');
+  btn.disabled = true; showMessage(msg, '');
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) { btn.disabled = false; return showMessage(msg, 'Wrong email or password.'); }
+  const profile = await getProfile();
+  if (!profile) { await supabase.auth.signOut(); btn.disabled = false; return showMessage(msg, 'No profile found for this account. Please create an account first.'); }
+  if (profile.blocked) { await supabase.auth.signOut(); btn.disabled = false; return showMessage(msg, 'This account has been blocked. Please contact support.'); }
+  window.location.replace(pageForRole(profile.role));
+});
+</script>
+</body>
+</html>
