@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SwiftRide Rider</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="screen">
+  <div class="brand"><i></i>SwiftRide Rider</div>
+  <h1 id="hi">Hi</h1>
+  <p class="sub">Welcome to the rider side</p>
+  <div class="hero"><strong style="font-size:20px">Next: your documents</strong><p>Next we add the screen where you upload your photos, licence and bike papers.</p></div>
+  <div class="spacer"></div>
+  <button id="out" class="link" type="button">Sign out</button>
+</main>
+<script type="module">
+import { requireRole, signOut } from './common.js';
+const profile = await requireRole('rider');
+if (profile) document.getElementById('hi').textContent = 'Hi, ' + profile.full_name.split(' ')[0];
+document.getElementById('out').addEventListener('click', signOut);
+</script>
+</body>
+</html>

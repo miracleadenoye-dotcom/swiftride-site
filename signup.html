@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create your account | SwiftRide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="screen">
+  <h1>Create your account</h1>
+  <p class="sub">Join SwiftRide in seconds</p>
+  <p id="msg" class="msg err" hidden role="alert"></p>
+  <form id="form" style="display:flex;flex-direction:column;gap:14px" novalidate>
+    <span style="font-size:14px;font-weight:600">I'm signing up as</span>
+    <div class="roles">
+      <button type="button" class="role" data-role="customer" aria-pressed="true">Customer</button>
+      <button type="button" class="role" data-role="rider" aria-pressed="false">Rider</button>
+    </div>
+    <label>Full name<input id="name" type="text" placeholder="Adaeze Okafor" autocomplete="name" required></label>
+    <label>Phone number<input id="phone" type="tel" placeholder="0803 000 0000" autocomplete="tel" required></label>
+    <label>Email address (Gmail)<input id="email" type="email" placeholder="you@gmail.com" autocomplete="email" required></label>
+    <label>Password<input id="password" type="password" placeholder="At least 8 characters" autocomplete="new-password" required></label>
+    <button id="go" class="btn" type="submit">Create account</button>
+  </form>
+  <a class="link" href="signin.html">Already have an account? Sign in</a>
+</main>
+<script type="module">
+import { supabase, pageForRole, showMessage } from './common.js';
+const msg = document.getElementById('msg');
+let role = 'customer';
+document.querySelectorAll('.role').forEach(b => b.addEventListener('click', () => {
+  role = b.dataset.role;
+  document.querySelectorAll('.role').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+}));
+document.getElementById('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const full_name = document.getElementById('name').value.trim();
+  const phone = document.getElementById('phone').value.replace(/\s+/g, '');
+  const email = document.getElementById('email').value.trim().toLowerCase();
+  const password = document.getElementById('password').value;
+  if (full_name.length < 2) return showMessage(msg, 'Please enter your full name.');
+  if (!/^\+?\d{10,14}$/.test(phone)) return showMessage(msg, 'Please enter a valid phone number.');
+  if (!/^\S+@\S+\.\S+$/.test(email)) return showMessage(msg, 'Please enter a valid email address.');
+  if (password.length < 8) return showMessage(msg, 'Your password needs at least 8 characters.');
+  const btn = document.getElementById('go');
+  btn.disabled = true; showMessage(msg, '');
+  const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name } } });
+  if (error) { btn.disabled = false; return showMessage(msg, error.message); }
+  if (!data.session) { btn.disabled = false; return showMessage(msg, 'Account created. Please confirm your email, then sign in.', true); }
+  const { error: pErr } = await supabase.from('profiles').insert({ id: data.user.id, role, full_name, phone, email });
+  if (pErr) { btn.disabled = false; return showMessage(msg, 'Your account was created but your profile could not be saved: ' + pErr.message); }
+  window.location.replace(pageForRole(role));
+});
+</script>
+</body>
+</html>
