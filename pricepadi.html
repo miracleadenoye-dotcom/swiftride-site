@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Name your Price Padi | SwiftRide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="screen">
+  <div class="brand"><i></i>SwiftRide</div>
+  <div class="progress" id="bar" aria-hidden="true"><i></i><i></i><i></i></div>
+  <span style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--mute)">Optional</span>
+  <h1>Name your Price Padi</h1>
+  <p class="sub" style="margin-top:-6px">Your Price Padi helps you offer fair prices, with small jokes. Give it any name you like.</p>
+  <p id="msg" class="msg err" hidden role="alert"></p>
+  <label>Price Padi name<input id="name" type="text" placeholder="Chairman" maxlength="30"></label>
+  <div class="chips" id="chips">
+    <button class="chip" type="button">Chairman</button><button class="chip" type="button">Omo Iya</button><button class="chip" type="button">Tunde</button><button class="chip" type="button">My Guy</button>
+  </div>
+  <p class="sub" style="margin:0;font-size:13px">You can change this later in your profile.</p>
+  <div class="spacer"></div>
+  <button id="go" class="btn" type="button">Save and continue</button>
+  <button id="skip" class="link" type="button">Skip for now</button>
+</main>
+<script type="module">
+import { supabase, requireRole, showMessage } from './common.js';
+const msg = document.getElementById('msg');
+const from = new URLSearchParams(location.search).get('from');
+const next = from === 'profile' ? 'profile.html' : 'customer.html';
+const profile = await requireRole('customer');
+if (from === 'profile') document.getElementById('bar').hidden = true;
+const input = document.getElementById('name');
+if (profile && profile.price_padi_name) input.value = profile.price_padi_name;
+document.querySelectorAll('#chips .chip').forEach(c => c.addEventListener('click', () => { input.value = c.textContent; }));
+document.getElementById('skip').addEventListener('click', () => window.location.replace(next));
+document.getElementById('go').addEventListener('click', async () => {
+  const name = input.value.trim().replace(/\s+/g, ' ');
+  if (!name) return window.location.replace(next);
+  if (!profile) return;
+  const { error } = await supabase.from('profiles').update({ price_padi_name: name }).eq('id', profile.id);
+  if (error) return showMessage(msg, 'Could not save: ' + error.message);
+  window.location.replace(next);
+});
+</script>
+</body>
+</html>

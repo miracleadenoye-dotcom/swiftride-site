@@ -52,7 +52,7 @@ document.getElementById('form').addEventListener('submit', async (e) => {
   if (!data.session) { btn.disabled = false; return showMessage(msg, 'Account created. Please confirm your email, then sign in.', true); }
   const { error: pErr } = await supabase.from('profiles').insert({ id: data.user.id, role, full_name, phone, email });
   if (pErr) { btn.disabled = false; return showMessage(msg, 'Your account was created but your profile could not be saved: ' + pErr.message); }
-  window.location.replace(pageForRole(role));
+  window.location.replace(role === 'customer' ? 'photo.html' : pageForRole(role));
 });
 </script>
 </body>

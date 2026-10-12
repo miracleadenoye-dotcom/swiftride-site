@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add your photo | SwiftRide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="screen">
+  <div class="brand"><i></i>SwiftRide</div>
+  <div class="progress" id="bar" aria-hidden="true"><i></i><i></i><i></i></div>
+  <h1>Add your photo</h1>
+  <p class="sub">Riders use it to recognise you at pickup.</p>
+  <p id="msg" class="msg err" hidden role="alert"></p>
+  <button id="pick" class="pick" type="button" aria-label="Choose your photo"><span style="font-size:44px;line-height:1">+</span>Tap to add</button>
+  <div class="row2">
+    <label class="btn small" style="display:flex;align-items:center;justify-content:center;text-transform:none;letter-spacing:0;color:var(--ink);font-size:15px">Take a photo<input id="cam" type="file" accept="image/*" capture="user" hidden></label>
+    <label class="btn small" style="display:flex;align-items:center;justify-content:center;text-transform:none;letter-spacing:0;color:var(--ink);font-size:15px">From gallery<input id="gal" type="file" accept="image/jpeg,image/png,image/webp" hidden></label>
+  </div>
+  <div class="spacer"></div>
+  <button id="go" class="btn" type="button" disabled>Continue</button>
+</main>
+<script type="module">
+import { supabase, requireRole, shrinkImage, showMessage } from './common.js';
+const msg = document.getElementById('msg');
+const from = new URLSearchParams(location.search).get('from');
+const profile = await requireRole('customer');
+if (from === 'profile') document.getElementById('bar').hidden = true;
+let blob = null;
+const pick = document.getElementById('pick'), go = document.getElementById('go');
+async function chosen(file) {
+  if (!file) return;
+  try {
+    blob = await shrinkImage(file);
+    pick.innerHTML = '';
+    const img = document.createElement('img'); img.alt = 'Your photo'; img.src = URL.createObjectURL(blob);
+    pick.appendChild(img); go.disabled = false; showMessage(msg, '');
+  } catch (e) { showMessage(msg, 'Please choose a photo (JPEG, PNG or WebP).'); }
+}
+document.getElementById('cam').addEventListener('change', e => chosen(e.target.files[0]));
+document.getElementById('gal').addEventListener('change', e => chosen(e.target.files[0]));
+pick.addEventListener('click', () => document.getElementById('gal').click());
+go.addEventListener('click', async () => {
+  if (!blob || !profile) return;
+  go.disabled = true; showMessage(msg, '');
+  const path = `${profile.id}/avatar-${Date.now()}.jpg`;
+  const up = await supabase.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg' });
+  if (up.error) { go.disabled = false; return showMessage(msg, 'Upload failed: ' + up.error.message); }
+  const upd = await supabase.from('profiles').update({ photo_url: path }).eq('id', profile.id);
+  if (upd.error) { go.disabled = false; return showMessage(msg, 'Could not save your photo: ' + upd.error.message); }
+  if (profile.photo_url) await supabase.storage.from('photos').remove([profile.photo_url]);
+  window.location.replace(from === 'profile' ? 'profile.html' : 'pricepadi.html');
+});
+</script>
+</body>
+</html>
