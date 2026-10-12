@@ -66,3 +66,23 @@ export function shrinkImage(file, max = 800) {
     img.src = URL.createObjectURL(file);
   });
 }
+
+export async function activeRide(userId) {
+  const { data } = await supabase.from('rides').select('id,status')
+    .eq('customer_id', userId).in('status', ['requested', 'accepted', 'arrived', 'in_progress'])
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  return data;
+}
+
+export const naira = (n) => '₦' + Number(n).toLocaleString('en-NG', { maximumFractionDigits: 0 });
+
+export const BIKE_SVG = '<svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="35" r="7"/><circle cx="38" cy="35" r="7"/><path d="M11 35l10-13h9l8 13M30 22l3-6h5M21 22l3-5"/><circle cx="24" cy="11" r="4" fill="#ffffff"/></svg>';
+
+// Price Padi: fixed rules, no AI
+export function padiVerdict(offered, estimated) {
+  const r = offered / estimated;
+  if (r > 1.0001) return { key: 'generous', label: 'Generous offer', text: 'Omo, you fit save money o! Check that offer again.' };
+  if (r >= 0.85) return { key: 'fair', label: 'Fair deal', text: 'Omo, you and this driver fit settle sharp sharp!' };
+  if (r >= 0.60) return { key: 'low', label: 'Low offer', text: 'My guy, try add small something.' };
+  return { key: 'aba', label: 'Aba mode', text: 'Oga, you wan reach your destination or just greet the driver?' };
+}

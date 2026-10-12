@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your ride | SwiftRide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="screen" style="padding:0;gap:0">
+  <div class="topbar" style="padding:14px 20px">
+    <a class="avatar" href="customer.html" aria-label="Back to home">&larr;</a>
+    <strong style="font-size:17px">Your ride</strong>
+    <span style="width:44px"></span>
+  </div>
+  <div id="map" class="map" role="application" aria-label="Map of your ride"></div>
+  <section class="sheet" id="sheet">
+    <div id="status" class="statusbar" role="status" aria-live="polite">Loading...</div>
+    <p id="msg" class="msg err" hidden role="alert"></p>
+    <div id="body" style="display:flex;flex-direction:column;gap:14px"></div>
+  </section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script type="module">
+import { supabase, requireRole, avatarUrl, initials, naira, showMessage } from './common.js';
+const profile = await requireRole('customer');
+if (!profile) throw new Error('not signed in');
+const id = new URLSearchParams(location.search).get('id');
+if (!id) window.location.replace('customer.html');
+const $ = (x) => document.getElementById(x);
+const map = L.map('map').setView([7.6211, 5.2214], 14);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+let ride = null, counter = null, pin = null, rated = false, riderMark = null, drawnFor = null, lastKey = '';
+
+function el(tag, props = {}, ...kids) {
+  const e = document.createElement(tag);
+  Object.entries(props).forEach(([k, v]) => { if (k === 'class') e.className = v; else if (k === 'on') Object.entries(v).forEach(([ev, fn]) => e.addEventListener(ev, fn)); else e.setAttribute(k, v); });
+  kids.forEach((c) => e.append(c));
+  return e;
+}
+function drawRoute() {
+  if (drawnFor === ride.id) return; drawnFor = ride.id;
+  const a = [ride.pickup_lat, ride.pickup_lng], b = [ride.destination_lat, ride.destination_lng];
+  L.circleMarker(a, { radius: 9, color: '#fff', weight: 3, fillColor: '#000033', fillOpacity: 1 }).addTo(map);
+  L.circleMarker(b, { radius: 9, color: '#000033', weight: 3, fillColor: '#30B050', fillOpacity: 1 }).addTo(map);
+  const line = L.polyline([a, b], { color: '#0D47A1', weight: 4, dashArray: '6 8' }).addTo(map);
+  map.fitBounds(line.getBounds(), { padding: [40, 40] });
+}
+async function cancelRide() {
+  if (!confirm('Cancel this ride?')) return;
+  const { error } = await supabase.rpc('cancel_ride', { p_ride_id: ride.id, p_reason: 'Cancelled by customer' });
+  if (error) showMessage($('msg'), error.message); else refresh();
+}
+async function sos() {
+  if (!confirm('Send an SOS alert to SwiftRide support?')) return;
+  const { error } = await supabase.rpc('send_sos', { p_ride_id: ride.id });
+  showMessage($('msg'), error ? error.message : 'SOS sent. SwiftRide support has been alerted.', !error);
+}
+async function loadExtras() {
+  if (['accepted', 'arrived', 'in_progress'].includes(ride.status)) {
+    if (!counter || counter.forRide !== ride.id) {
+      const { data } = await supabase.rpc('ride_counterpart', { p_ride_id: ride.id });
+      if (data && data[0]) { counter = { ...data[0], forRide: ride.id }; counter.photo = await avatarUrl(counter.photo_url); }
+    }
+    const { data: p } = await supabase.from('ride_pins').select('pin').eq('ride_id', ride.id).maybeSingle();
+    pin = p ? p.pin : null;
+    const { data: loc } = await supabase.from('live_locations').select('lat,lng').eq('rider_id', ride.rider_id).maybeSingle();
+    if (loc) { if (!riderMark) riderMark = L.circleMarker([loc.lat, loc.lng], { radius: 10, color: '#fff', weight: 3, fillColor: '#0D47A1', fillOpacity: 1 }).addTo(map); else riderMark.setLatLng([loc.lat, loc.lng]); }
+  }
+  if (ride.status === 'completed' && !rated) {
+    const { data: r } = await supabase.from('ratings').select('id').eq('ride_id', ride.id).eq('from_user', profile.id).maybeSingle();
+    rated = !!r;
+  }
+}
+function riderCard() {
+  const photo = counter && counter.photo ? el('img', { src: counter.photo, alt: '', class: 'avatar big', style: 'object-fit:cover' }) : el('div', { class: 'avatar big' }, initials(counter ? counter.full_name : 'R'));
+  const info = el('div', { style: 'flex:1;min-width:0;display:flex;flex-direction:column;gap:2px' },
+    el('strong', { style: 'font-size:18px' }, counter ? counter.full_name : 'Your rider'),
+    el('span', { class: 'sub', style: 'margin:0;font-size:14px' }, counter && counter.plate_number ? 'Plate ' + counter.plate_number : ''));
+  const row = [photo, info];
+  if (counter && counter.phone) row.push(el('a', { href: 'tel:' + counter.phone, class: 'avatar', 'aria-label': 'Call your rider', style: 'width:48px;height:48px' }, '\u260E'));
+  return el('div', { class: 'card', style: 'display:flex;align-items:center;gap:14px' }, ...row);
+}
+function pinBox() {
+  const digits = (pin || '----').split('').map((d) => el('b', {}, d));
+  return el('div', { class: 'card', style: 'display:flex;align-items:center;justify-content:space-between;gap:10px' },
+    el('div', {}, el('span', { class: 'lbl' }, 'Trip PIN'), el('div', { class: 'sub', style: 'margin:2px 0 0;font-size:13px' }, 'Tell the rider this code')),
+    el('div', { class: 'pin' }, ...digits));
+}
+function render() {
+  drawRoute();
+  const key = JSON.stringify([ride.status, ride.rider_id, counter && counter.forRide, pin, rated]);
+  const s = ride.status, body = $('body'), st = $('status');
+  if (key !== lastKey) { lastKey = key; body.innerHTML = ''; } else { return; }
+  const money = el('div', { style: 'display:flex;justify-content:space-between' }, el('span', { class: 'sub', style: 'margin:0' }, ride.status === 'requested' ? 'Your offer, pay cash' : 'Fare, pay cash'), el('strong', {}, naira(ride.agreed_price || ride.offered_price)));
+  if (s === 'requested') {
+    st.textContent = 'Finding a rider...';
+    body.append(el('p', { class: 'sub', style: 'margin:0' }, 'Nearby riders can accept your offer. This usually takes a few minutes.'), money,
+      el('button', { class: 'btn small', type: 'button', on: { click: cancelRide } }, 'Cancel ride'));
+  } else if (s === 'accepted' || s === 'arrived') {
+    st.textContent = s === 'accepted' ? 'Your rider is on the way' : 'Your rider has arrived';
+    body.append(riderCard(), pinBox(), money,
+      el('button', { class: 'danger', type: 'button', on: { click: sos } }, 'SOS'),
+      el('button', { class: 'link', type: 'button', on: { click: cancelRide } }, 'Cancel ride'));
+  } else if (s === 'in_progress') {
+    st.textContent = 'Trip in progress';
+    body.append(riderCard(), money, el('button', { class: 'danger', type: 'button', on: { click: sos } }, 'SOS'));
+  } else if (s === 'completed') {
+    st.textContent = 'Trip complete';
+    if (rated) { body.append(el('p', { class: 'sub', style: 'margin:0' }, 'Thanks for your rating.'), el('a', { class: 'btn', href: 'customer.html', style: 'display:flex;align-items:center;justify-content:center;text-decoration:none' }, 'Back to home')); }
+    else ratingForm(money);
+  } else {
+    st.textContent = 'Ride cancelled';
+    body.append(el('p', { class: 'sub', style: 'margin:0' }, 'This ride was cancelled.'), el('a', { class: 'btn', href: 'customer.html', style: 'display:flex;align-items:center;justify-content:center;text-decoration:none' }, 'Back to home'));
+  }
+}
+function ratingForm(money) {
+  let stars = 0; const tags = new Set();
+  const body = $('body');
+  const starBtns = [1, 2, 3, 4, 5].map((n) => el('button', { type: 'button', 'aria-label': n + ' star' + (n > 1 ? 's' : ''), 'aria-pressed': 'false', on: { click: () => { stars = n; starBtns.forEach((b, i) => b.setAttribute('aria-pressed', String(i < n))); send.disabled = false; } } }, '\u2605'));
+  const chips = ['On time', 'Safe riding', 'Polite', 'Clean helmet'].map((t) => el('button', { class: 'chip', type: 'button', 'aria-pressed': 'false', on: { click: (e) => { const b = e.currentTarget; if (tags.has(t)) { tags.delete(t); b.setAttribute('aria-pressed', 'false'); } else { tags.add(t); b.setAttribute('aria-pressed', 'true'); } } } }, t));
+  const comment = el('textarea', { placeholder: 'Tell us more (optional)', maxlength: '500', 'aria-label': 'Comment' });
+  const send = el('button', { class: 'btn', type: 'button', disabled: 'true', on: { click: async () => {
+    send.disabled = true;
+    const { error } = await supabase.rpc('rate_ride', { p_ride_id: ride.id, p_stars: stars, p_tags: [...tags], p_comment: comment.value.trim() || null });
+    if (error) { send.disabled = false; return showMessage($('msg'), error.message); }
+    rated = true; refresh();
+  } } }, 'Submit rating');
+  body.append(money, el('strong', { style: 'font-size:22px' }, 'How was your ride?'), el('div', { class: 'stars' }, ...starBtns), el('div', { class: 'chips' }, ...chips), comment, send);
+}
+async function refresh() {
+  const { data, error } = await supabase.from('rides').select('*').eq('id', id).maybeSingle();
+  if (error || !data) { showMessage($('msg'), 'Could not load this ride.'); return; }
+  ride = data; await loadExtras(); render();
+}
+await refresh();
+supabase.channel('ride-' + id).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rides', filter: 'id=eq.' + id }, () => refresh()).subscribe();
+setInterval(() => { if (document.visibilityState === 'visible' && ride && !['cancelled'].includes(ride.status) && !(ride.status === 'completed' && rated)) refresh(); }, 5000);
+</script>
+</body>
+</html>

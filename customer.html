@@ -18,7 +18,8 @@
     <h1 id="hi">Hi</h1>
     <p class="sub" style="margin-top:4px">Where are we going today?</p>
   </div>
-  <div class="hero"><strong style="font-size:22px">Book a ride</strong><p>Ride booking is the next thing we are building.</p></div>
+  <div id="active" class="card" hidden style="border-color:var(--green)"><strong>You have a ride in progress</strong><p class="sub" style="margin:4px 0 8px">Tap to see where it is.</p><a class="link" id="activeLink" href="#" style="padding:0">Open my ride</a></div>
+  <div class="hero"><a href="book.html"><strong style="font-size:22px">Book a ride</strong><p>Pick a pickup, name your price, and go.</p></a></div>
   <div class="tiles">
     <div class="tile"><strong>Send a package</strong><span class="soon">SwiftRide for Business</span></div>
     <div class="tile"><strong>Ride history</strong><small>Receipts and trips</small><span class="soon">Soon</span></div>
@@ -32,7 +33,7 @@
   </nav>
 </main>
 <script type="module">
-import { requireRole, avatarUrl, initials } from './common.js';
+import { requireRole, avatarUrl, initials, activeRide } from './common.js';
 const profile = await requireRole('customer');
 if (profile) {
   if (!profile.photo_url) window.location.replace('photo.html');
@@ -41,6 +42,8 @@ if (profile) {
   const url = await avatarUrl(profile.photo_url);
   if (url) { const i = document.createElement('img'); i.src = url; i.alt = ''; i.style.cssText = 'width:100%;height:100%;object-fit:cover'; av.appendChild(i); }
   else av.textContent = initials(profile.full_name);
+  const r = await activeRide(profile.id);
+  if (r) { document.getElementById('active').hidden = false; document.getElementById('activeLink').href = 'ride.html?id=' + r.id; }
 }
 </script>
 </body>
