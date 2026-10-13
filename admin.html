@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin Dashboard | SwiftRide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+.admin-screen {
+  max-width: 800px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--bg);
+  padding: 24px 20px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.admin-card {
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,51,0.04);
+}
+.rider-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.doc-thumb-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--mute);
+  font-weight: 600;
+}
+.doc-thumb-box img {
+  width: 90px;
+  height: 90px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1.5px solid var(--line);
+  cursor: pointer;
+  background: #EEF4FF;
+  transition: transform 0.15s;
+}
+.doc-thumb-box img:hover {
+  transform: scale(1.05);
+  border-color: var(--blue);
+}
+.btn-approve {
+  height: 42px;
+  padding: 0 18px;
+  background: var(--green);
+  color: var(--ink);
+  font-weight: 700;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+}
+.btn-reject {
+  height: 42px;
+  padding: 0 18px;
+  background: #FDECEC;
+  color: #8A1C1C;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 1.5px solid #F87171;
+  cursor: pointer;
+}
+.badge-pending {
+  background: #FEF3C7;
+  color: #92400E;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.badge-approved {
+  background: #E9F7EE;
+  color: #14532D;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+/* Modal for viewing full images */
+#imgModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,51,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  cursor: pointer;
+}
+#imgModal img {
+  max-width: 90vw;
+  max-height: 85vh;
+  border-radius: 12px;
+  border: 3px solid #fff;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+</style>
+</head>
+<body>
+<main class="admin-screen">
+  <!-- Top header -->
+  <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid var(--line);padding-bottom:16px">
+    <div class="brand"><i></i>SwiftRide Admin</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span id="adminEmail" style="font-size:13px;font-weight:600;color:var(--mute)">Admin</span>
+      <button id="logout" class="link" type="button" style="padding:0">Log out</button>
+    </div>
+  </div>
+
+  <div>
+    <h1 style="font-size:24px">Rider Approvals</h1>
+    <p class="sub">Verify rider identity, motorcycle details, and documents in Ekiti State.</p>
+  </div>
+
+  <p id="msg" class="msg err" hidden role="alert"></p>
+
+  <!-- PENDING RIDERS SECTION -->
+  <div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <h2 style="font-size:18px;margin:0">Pending Verification</h2>
+      <span class="badge-pending" id="pendingCount">0</span>
+    </div>
+
+    <div id="pendingList" style="display:flex;flex-direction:column;gap:16px">
+      <div class="admin-card" style="text-align:center;color:var(--mute)">Loading rider applications...</div>
+    </div>
+  </div>
+
+  <!-- APPROVED RIDERS SECTION -->
+  <div style="margin-top:20px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <h2 style="font-size:18px;margin:0">Approved Active Riders</h2>
+      <span class="badge-approved" id="approvedCount">0</span>
+    </div>
+
+    <div id="approvedList" style="display:flex;flex-direction:column;gap:12px">
+      <div class="admin-card" style="text-align:center;color:var(--mute)">Loading approved riders...</div>
+    </div>
+  </div>
+</main>
+
+<!-- Photo Preview Modal -->
+<div id="imgModal" hidden>
+  <img id="modalImg" src="" alt="Full preview">
+</div>
+
+<script type="module">
+import { supabase, getProfile } from './common.js';
+
+// Verify Admin role or redirect to admin-login.html
+const profile = await getProfile();
+if (!profile || profile.role !== 'admin') {
+  window.location.replace('admin-login.html');
+  throw new Error('Not admin');
+}
+
+const $ = (id) => document.getElementById(id);
+$('adminEmail').textContent = profile.email || profile.full_name;
+
+$('logout').addEventListener('click', async () => {
+  await supabase.auth.signOut();
+  window.location.replace('admin-login.html');
+});
+
+const modal = $('imgModal');
+const modalImg = $('modalImg');
+modal.addEventListener('click', () => { modal.hidden = true; });
+
+function viewPhoto(url) {
+  if (!url) return;
+  modalImg.src = url;
+  modal.hidden = false;
+}
+
+async function getPhotoUrl(path) {
+  if (!path) return null;
+  const { data } = await supabase.storage.from('photos').createSignedUrl(path, 3600);
+  return data ? data.signedUrl : null;
+}
+
+async function loadRiders() {
+  $('msg').hidden = true;
+  
+  // Fetch riders with their profile info
+  const { data: riders, error } = await supabase
+    .from('riders')
+    .select('*, profiles(full_name, phone, email, created_at)')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    $('msg').textContent = 'Error loading riders: ' + error.message;
+    $('msg').hidden = false;
+    return;
+  }
+
+  const pending = riders.filter(r => r.status === 'pending');
+  const approved = riders.filter(r => r.status === 'approved');
+
+  $('pendingCount').textContent = pending.length;
+  $('approvedCount').textContent = approved.length;
+
+  renderPending(pending);
+  renderApproved(approved);
+}
+
+async function renderPending(list) {
+  const container = $('pendingList');
+  container.innerHTML = '';
+
+  if (!list.length) {
+    container.innerHTML = `<div class="admin-card" style="text-align:center;color:var(--mute);padding:28px">
+      <div style="font-size:32px;margin-bottom:8px">🎉</div>
+      <strong>All caught up!</strong>
+      <p style="margin:4px 0 0;font-size:13px">There are no pending rider applications waiting for approval.</p>
+    </div>`;
+    return;
+  }
+
+  for (const r of list) {
+    const card = document.createElement('div');
+    card.className = 'admin-card';
+
+    const p = r.profiles || {};
+    const [faceUrl, bikeUrl, plateUrl, licUrl, papUrl] = await Promise.all([
+      getPhotoUrl(r.face_photo_url),
+      getPhotoUrl(r.bike_photo_url),
+      getPhotoUrl(r.plate_photo_url),
+      getPhotoUrl(r.licence_url),
+      getPhotoUrl(r.bike_papers_url)
+    ]);
+
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <strong style="font-size:17px;color:var(--ink)">${p.full_name || 'Rider'}</strong>
+          <p style="margin:2px 0 0;font-size:13px;color:var(--mute)">Phone: ${p.phone || 'N/A'} • Email: ${p.email || 'N/A'}</p>
+          <div style="margin-top:6px">
+            <span style="font-size:13px;font-weight:700;color:var(--blue);background:#EEF4FF;padding:4px 10px;border-radius:8px">
+              Plate: ${r.plate_number}
+            </span>
+          </div>
+        </div>
+        <span class="badge-pending">Pending</span>
+      </div>
+
+      <div>
+        <span style="font-size:12px;font-weight:700;color:var(--mute);text-transform:uppercase">Verification Photos (Tap to enlarge):</span>
+        <div class="rider-grid">
+          ${faceUrl ? `<div class="doc-thumb-box"><span>Face Photo</span><img src="${faceUrl}" data-url="${faceUrl}"></div>` : ''}
+          ${bikeUrl ? `<div class="doc-thumb-box"><span>Motorcycle</span><img src="${bikeUrl}" data-url="${bikeUrl}"></div>` : ''}
+          ${plateUrl ? `<div class="doc-thumb-box"><span>Plate Number</span><img src="${plateUrl}" data-url="${plateUrl}"></div>` : ''}
+          ${licUrl ? `<div class="doc-thumb-box"><span>Licence/ID</span><img src="${licUrl}" data-url="${licUrl}"></div>` : ''}
+          ${papUrl ? `<div class="doc-thumb-box"><span>Bike Papers</span><img src="${papUrl}" data-url="${papUrl}"></div>` : ''}
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:6px">
+        <button type="button" class="btn-approve" data-id="${r.id}">Approve Rider</button>
+        <button type="button" class="btn-reject" data-id="${r.id}">Reject</button>
+      </div>
+    `;
+
+    // Photo tap handlers
+    card.querySelectorAll('img[data-url]').forEach(img => {
+      img.addEventListener('click', () => viewPhoto(img.dataset.url));
+    });
+
+    // Approve button
+    card.querySelector('.btn-approve').addEventListener('click', async (e) => {
+      const btn = e.target;
+      btn.disabled = true;
+      btn.textContent = 'Approving...';
+      const { error } = await supabase.rpc('approve_rider', { p_rider_id: r.id });
+      if (error) {
+        alert('Could not approve: ' + error.message);
+        btn.disabled = false;
+        btn.textContent = 'Approve Rider';
+      } else {
+        await loadRiders();
+      }
+    });
+
+    // Reject button
+    card.querySelector('.btn-reject').addEventListener('click', async () => {
+      const reason = prompt('Please enter reason for rejection (e.g. blurry photos, invalid plate):');
+      if (reason === null) return;
+      const { error } = await supabase.rpc('reject_rider', { p_rider_id: r.id, p_reason: reason || 'Documents invalid' });
+      if (error) {
+        alert('Could not reject: ' + error.message);
+      } else {
+        await loadRiders();
+      }
+    });
+
+    container.appendChild(card);
+  }
+}
+
+function renderApproved(list) {
+  const container = $('approvedList');
+  container.innerHTML = '';
+
+  if (!list.length) {
+    container.innerHTML = `<div class="admin-card" style="text-align:center;color:var(--mute)">No approved riders yet.</div>`;
+    return;
+  }
+
+  list.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'admin-card';
+    const p = r.profiles || {};
+
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <strong style="font-size:15px">${p.full_name || 'Rider'}</strong>
+          <span style="font-size:12px;color:var(--mute)">(${r.plate_number})</span>
+          <p style="margin:2px 0 0;font-size:12px;color:var(--mute)">${r.is_online ? '🟢 Currently Online' : '⚪ Offline'}</p>
+        </div>
+        <button type="button" class="btn-reject" style="height:34px;font-size:12px;padding:0 12px" data-id="${r.id}">Suspend</button>
+      </div>
+    `;
+
+    card.querySelector('button').addEventListener('click', async () => {
+      if (!confirm(`Suspend rider ${p.full_name}?`)) return;
+      const { error } = await supabase.rpc('suspend_rider', { p_rider_id: r.id, p_reason: 'Admin suspended' });
+      if (error) alert('Error: ' + error.message);
+      else await loadRiders();
+    });
+
+    container.appendChild(card);
+  });
+}
+
+await loadRiders();
+</script>
+</body>
+</html>
