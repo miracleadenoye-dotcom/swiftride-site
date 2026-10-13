@@ -8,6 +8,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <link rel="stylesheet" href="style.css">
+<style>
+.sug-box{position:relative}
+.sug{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--line);border-radius:12px;margin:4px 0 0;padding:6px 0;list-style:none;max-height:220px;overflow-y:auto;z-index:1000;box-shadow:0 8px 24px rgba(0,0,51,.15)}
+.sug li{padding:10px 14px;font-size:14px;font-weight:500;cursor:pointer;border-bottom:1px solid #f0f2f5;display:flex;align-items:center;gap:8px}
+.sug li:last-child{border-bottom:none}
+.sug li:hover{background:#F5F7FB;color:var(--blue)}
+.sug li.curr{color:var(--blue);font-weight:600}
+</style>
 </head>
 <body>
 <main class="screen" style="padding:0;gap:0">
@@ -21,11 +29,23 @@
   <section id="step1" class="sheet">
     <h1>Where to?</h1>
     <p id="msg" class="msg err" hidden role="alert"></p>
-    <div class="field"><div><small>Pickup</small><span id="pickupText">Locating you...</span></div><button id="chgPickup" class="chip" type="button" style="height:38px;font-size:13px">Change on map</button></div>
-    <label>Destination<input id="dest" type="text" placeholder="Search a town, street or place in Ekiti" autocomplete="off"></label>
-    <ul id="sug" class="sug" hidden></ul>
-    <div id="saved" class="chips"></div>
-    <p class="sub" style="margin:0;font-size:13px">You can also tap the map to drop a pin.</p>
+
+    <div class="sug-box">
+      <label>Pickup
+        <input id="pickup" type="text" placeholder="Search your pickup place" autocomplete="off">
+      </label>
+      <ul id="pickupSug" class="sug" hidden></ul>
+    </div>
+
+    <div class="sug-box" style="margin-top:12px">
+      <label>Destination
+        <input id="dest" type="text" placeholder="Search a town, street or place in Ekiti" autocomplete="off">
+      </label>
+      <ul id="destSug" class="sug" hidden></ul>
+    </div>
+
+    <div id="saved" class="chips" style="margin-top:10px"></div>
+    <p class="sub" style="margin:8px 0 0;font-size:13px">You can also tap the map to drop a pin.</p>
     <div class="spacer"></div>
     <button id="next" class="btn" type="button" disabled>Continue</button>
   </section>
@@ -59,7 +79,23 @@ const $ = (id) => document.getElementById(id);
 const CENTER = [7.72, 5.31]; // Ekiti State
 const map = L.map('map', { zoomControl: true }).setView(CENTER, 9);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
-let pickup = null, dest = null, tapMode = 'dest', pMark = null, dMark = null, line = null;
+
+const EKITI_TOWNS = [
+  { text: 'Ado-Ekiti', lat: 7.6211, lng: 5.2215 },
+  { text: 'Ikere-Ekiti', lat: 7.4981, lng: 5.2305 },
+  { text: 'Ijero-Ekiti', lat: 7.8151, lng: 5.0672 },
+  { text: 'Ikole-Ekiti', lat: 7.7983, lng: 5.5144 },
+  { text: 'Oye-Ekiti', lat: 7.7978, lng: 5.3317 },
+  { text: 'Efon-Alaaye', lat: 7.6564, lng: 4.9228 },
+  { text: 'Aramoko-Ekiti', lat: 7.7048, lng: 5.0405 },
+  { text: 'Emure-Ekiti', lat: 7.4395, lng: 5.4604 },
+  { text: 'Omuo-Ekiti', lat: 7.7583, lng: 5.7222 },
+  { text: 'Ise-Ekiti', lat: 7.4648, lng: 5.4233 },
+  { text: 'Ilawe-Ekiti', lat: 7.6006, lng: 5.1325 },
+  { text: 'Igede-Ekiti', lat: 7.6685, lng: 5.1264 }
+];
+
+let pickup = null, dest = null, activeField = 'dest', pMark = null, dMark = null, line = null;
 
 function km(a, b) {
   const R = 6371, rad = (d) => d * Math.PI / 180;
@@ -67,8 +103,11 @@ function km(a, b) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
+
 function draw() {
-  if (pMark) map.removeLayer(pMark); if (dMark) map.removeLayer(dMark); if (line) map.removeLayer(line);
+  if (pMark) map.removeLayer(pMark);
+  if (dMark) map.removeLayer(dMark);
+  if (line) map.removeLayer(line);
   if (pickup) pMark = L.circleMarker([pickup.lat, pickup.lng], { radius: 9, color: '#fff', weight: 3, fillColor: '#000033', fillOpacity: 1 }).addTo(map);
   if (dest) dMark = L.circleMarker([dest.lat, dest.lng], { radius: 9, color: '#000033', weight: 3, fillColor: '#30B050', fillOpacity: 1 }).addTo(map);
   if (pickup && dest) {
@@ -77,15 +116,34 @@ function draw() {
   }
   $('next').disabled = !(pickup && dest);
 }
-function setPickup(p) { pickup = p; $('pickupText').textContent = p.text; tapMode = 'dest'; $('chgPickup').setAttribute('aria-pressed', 'false'); draw(); }
-function setDest(p) { dest = p; $('dest').value = p.text; $('sug').hidden = true; draw(); }
 
-navigator.geolocation?.getCurrentPosition(
-  (pos) => { const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, text: 'Current location' }; setPickup(p); map.setView([p.lat, p.lng], 15); },
-  () => { $('pickupText').textContent = 'Tap the map to set pickup'; tapMode = 'pickup'; },
-  { enableHighAccuracy: true, timeout: 8000 });
-if (!navigator.geolocation) { $('pickupText').textContent = 'Tap the map to set pickup'; tapMode = 'pickup'; }
-$('chgPickup').addEventListener('click', () => { tapMode = 'pickup'; $('pickupText').textContent = 'Tap the map to set pickup'; });
+function setPickup(p) {
+  pickup = p;
+  $('pickup').value = p.text;
+  $('pickupSug').hidden = true;
+  draw();
+}
+
+function setDest(p) {
+  dest = p;
+  $('dest').value = p.text;
+  $('destSug').hidden = true;
+  draw();
+}
+
+// Auto-request location on load
+let userLoc = null;
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude, text: 'Current location' };
+      setPickup(userLoc);
+      map.setView([userLoc.lat, userLoc.lng], 14);
+    },
+    () => { /* location refused or timed out - customer can search or tap map */ },
+    { enableHighAccuracy: true, timeout: 8000 }
+  );
+}
 
 async function reverse(lat, lng) {
   try {
@@ -94,86 +152,228 @@ async function reverse(lat, lng) {
     return j.display_name ? j.display_name.split(',').slice(0, 2).join(',').trim() : null;
   } catch { return null; }
 }
+
 map.on('click', async (e) => {
   const { lat, lng } = e.latlng;
-  if (tapMode === 'pickup') { setPickup({ lat, lng, text: 'Pinned pickup' }); const t = await reverse(lat, lng); if (t && pickup) { pickup.text = t; $('pickupText').textContent = t; } }
-  else { setDest({ lat, lng, text: 'Pinned location' }); const t = await reverse(lat, lng); if (t && dest) { dest.text = t; $('dest').value = t; } }
+  if (activeField === 'pickup' || !pickup) {
+    setPickup({ lat, lng, text: 'Pinned pickup' });
+    const t = await reverse(lat, lng);
+    if (t && pickup) { pickup.text = t; $('pickup').value = t; }
+    activeField = 'dest';
+  } else {
+    setDest({ lat, lng, text: 'Pinned destination' });
+    const t = await reverse(lat, lng);
+    if (t && dest) { dest.text = t; $('dest').value = t; }
+  }
 });
 
-// destination search (OpenStreetMap Nominatim)
-let timer;
-$('dest').addEventListener('input', () => {
-  clearTimeout(timer); dest = null; draw();
-  const q = $('dest').value.trim();
-  if (q.length < 3) { $('sug').hidden = true; return; }
-  timer = setTimeout(async () => {
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=ng&viewbox=4.75,8.1,5.85,7.2&q=${encodeURIComponent(q)}`;
-      const list = await (await fetch(url)).json();
-      const ul = $('sug'); ul.innerHTML = '';
-      if (!list.length) { const li = document.createElement('li'); li.textContent = 'No match. Try another name, or tap the map.'; ul.appendChild(li); }
-      list.forEach((it) => {
-        const li = document.createElement('li');
-        li.textContent = it.display_name.split(',').slice(0, 3).join(',');
-        li.addEventListener('click', () => { setDest({ lat: +it.lat, lng: +it.lon, text: li.textContent }); map.setView([+it.lat, +it.lon], 15); });
-        ul.appendChild(li);
-      });
-      ul.hidden = false;
-    } catch { showMessage($('msg'), 'Search is not working right now. Tap the map instead.'); }
-  }, 700);
+function renderList(ulId, items, isPickup) {
+  const ul = $(ulId);
+  ul.innerHTML = '';
+  if (isPickup) {
+    const curLi = document.createElement('li');
+    curLi.className = 'curr';
+    curLi.textContent = '📍 Use my current location';
+    curLi.addEventListener('click', () => {
+      if (userLoc) {
+        setPickup(userLoc);
+        map.setView([userLoc.lat, userLoc.lng], 14);
+      } else if (navigator.geolocation) {
+        $('pickup').value = 'Locating you...';
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude, text: 'Current location' };
+            setPickup(userLoc);
+            map.setView([userLoc.lat, userLoc.lng], 14);
+          },
+          () => { showMessage($('msg'), 'Could not get location. Type your place instead.'); $('pickup').value = ''; },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      }
+    });
+    ul.appendChild(curLi);
+  }
+  items.forEach((it) => {
+    const li = document.createElement('li');
+    li.textContent = it.text;
+    li.addEventListener('click', () => {
+      if (isPickup) {
+        setPickup(it);
+      } else {
+        setDest(it);
+      }
+      map.setView([it.lat, it.lng], 14);
+    });
+    ul.appendChild(li);
+  });
+  ul.hidden = false;
+}
+
+$('pickup').addEventListener('focus', () => {
+  activeField = 'pickup';
+  $('destSug').hidden = true;
+  renderList('pickupSug', EKITI_TOWNS, true);
 });
 
-// saved places
+$('dest').addEventListener('focus', () => {
+  activeField = 'dest';
+  $('pickupSug').hidden = true;
+  renderList('destSug', EKITI_TOWNS, false);
+});
+
+let pTimer, dTimer;
+
+function setupSearch(inputEl, ulId, isPickup) {
+  inputEl.addEventListener('input', () => {
+    const ul = $(ulId);
+    const q = inputEl.value.trim();
+    if (isPickup) pickup = null; else dest = null;
+    draw();
+    if (q.length < 3) {
+      const filtered = EKITI_TOWNS.filter(t => t.text.toLowerCase().includes(q.toLowerCase()));
+      renderList(ulId, filtered.length ? filtered : EKITI_TOWNS, isPickup);
+      return;
+    }
+    const timer = isPickup ? pTimer : dTimer;
+    clearTimeout(timer);
+    const newTimer = setTimeout(async () => {
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=ng&viewbox=4.75,8.1,5.85,7.2&q=${encodeURIComponent(q)}`;
+        const res = await (await fetch(url)).json();
+        ul.innerHTML = '';
+        if (!res.length) {
+          const li = document.createElement('li');
+          li.textContent = 'No match. Try another name or tap the map.';
+          ul.appendChild(li);
+        } else {
+          res.forEach((it) => {
+            const li = document.createElement('li');
+            const cleanText = it.display_name.split(',').slice(0, 3).join(',');
+            li.textContent = cleanText;
+            li.addEventListener('click', () => {
+              const place = { lat: +it.lat, lng: +it.lon, text: cleanText };
+              if (isPickup) setPickup(place); else setDest(place);
+              map.setView([place.lat, place.lng], 14);
+            });
+            ul.appendChild(li);
+          });
+        }
+        ul.hidden = false;
+      } catch {
+        showMessage($('msg'), 'Search is busy. Pick from list or tap map.');
+      }
+    }, 600);
+    if (isPickup) pTimer = newTimer; else dTimer = newTimer;
+  });
+}
+
+setupSearch($('pickup'), 'pickupSug', true);
+setupSearch($('dest'), 'destSug', false);
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.sug-box')) {
+    $('pickupSug').hidden = true;
+    $('destSug').hidden = true;
+  }
+});
+
+// Saved places
 const { data: places } = await supabase.from('saved_places').select('*').order('created_at');
 (places || []).forEach((p) => {
-  const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = p.label;
-  b.addEventListener('click', () => { setDest({ lat: p.lat, lng: p.lng, text: p.address_text }); map.setView([p.lat, p.lng], 15); });
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'chip'; b.textContent = p.label;
+  b.addEventListener('click', () => {
+    setDest({ lat: p.lat, lng: p.lng, text: p.address_text });
+    map.setView([p.lat, p.lng], 14);
+  });
   $('saved').appendChild(b);
 });
 
-// fare settings
+// Fare settings & Step 2
 let S = { base_fare: 300, price_per_km: 100, minimum_fare: 400, small_bag_extra: 100, big_load_extra: 300 };
 const { data: srow } = await supabase.from('settings').select('*').eq('id', 1).maybeSingle();
 if (srow) S = srow;
+
 let load = 'none', est = 0, offer = 0, edited = false, distance = 0;
 const round50 = (n) => Math.max(50, Math.round(n / 50) * 50);
+
 function estimate() {
   const extra = load === 'small_bag' ? +S.small_bag_extra : load === 'big_load' ? +S.big_load_extra : 0;
   return round50(Math.max(+S.minimum_fare, +S.base_fare + +S.price_per_km * distance) + extra);
 }
+
 function render() {
   $('est').textContent = naira(est);
   $('amt').textContent = naira(offer);
   const v = padiVerdict(offer, est);
   $('padiText').textContent = v.text;
-  $('padiChip').textContent = v.label; $('padiChip').className = 'vc ' + v.key;
+  $('padiChip').textContent = v.label;
+  $('padiChip').className = 'vc ' + v.key;
 }
+
 $('padiIcon').innerHTML = BIKE_SVG;
 $('padiName').textContent = profile.price_padi_name || 'Price Padi';
 
 $('next').addEventListener('click', () => {
-  distance = Math.max(0.3, km(pickup, dest) * 1.3); // straight line plus 30% for road bends
-  est = estimate(); if (!edited) offer = est;
+  distance = Math.max(0.3, km(pickup, dest) * 1.3);
+  est = estimate();
+  if (!edited) offer = est;
   $('route').textContent = `${pickup.text} to ${dest.text} (about ${distance.toFixed(1)} km)`;
-  $('step1').hidden = true; $('step2').hidden = false; render(); window.scrollTo(0, 0);
+  $('step1').hidden = true;
+  $('step2').hidden = false;
+  render();
+  window.scrollTo(0, 0);
 });
-$('back').addEventListener('click', () => { $('step2').hidden = true; $('step1').hidden = false; });
-$('minus').addEventListener('click', () => { offer = Math.max(100, offer - 50); edited = true; render(); });
-$('plus').addEventListener('click', () => { offer = Math.min(100000, offer + 50); edited = true; render(); });
-document.querySelectorAll('#loads button').forEach((b) => b.addEventListener('click', () => {
-  load = b.dataset.v;
-  document.querySelectorAll('#loads button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-  est = estimate(); if (!edited) offer = est; render();
-}));
+
+$('back').addEventListener('click', () => {
+  $('step2').hidden = true;
+  $('step1').hidden = false;
+});
+
+$('minus').addEventListener('click', () => {
+  offer = Math.max(100, offer - 50);
+  edited = true;
+  render();
+});
+
+$('plus').addEventListener('click', () => {
+  offer = Math.min(100000, offer + 50);
+  edited = true;
+  render();
+});
+
+document.querySelectorAll('#loads button').forEach((b) => {
+  b.addEventListener('click', () => {
+    load = b.dataset.v;
+    document.querySelectorAll('#loads button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    est = estimate();
+    if (!edited) offer = est;
+    render();
+  });
+});
+
 $('request').addEventListener('click', async () => {
-  const btn = $('request'); btn.disabled = true; showMessage($('msg2'), '');
+  const btn = $('request');
+  btn.disabled = true;
+  showMessage($('msg2'), '');
   const row = {
-    customer_id: profile.id, pickup_text: pickup.text.slice(0, 200), pickup_lat: pickup.lat, pickup_lng: pickup.lng,
-    destination_text: dest.text.slice(0, 200), destination_lat: dest.lat, destination_lng: dest.lng,
-    load_type: load, estimated_fare: est, offered_price: offer, payment_method: 'cash'
+    customer_id: profile.id,
+    pickup_text: pickup.text.slice(0, 200),
+    pickup_lat: pickup.lat,
+    pickup_lng: pickup.lng,
+    destination_text: dest.text.slice(0, 200),
+    destination_lat: dest.lat,
+    destination_lng: dest.lng,
+    load_type: load,
+    estimated_fare: est,
+    offered_price: offer,
+    payment_method: 'cash'
   };
   const { data, error } = await supabase.from('rides').insert(row).select('id').single();
-  if (error) { btn.disabled = false; return showMessage($('msg2'), 'Could not request your ride: ' + error.message); }
+  if (error) {
+    btn.disabled = false;
+    return showMessage($('msg2'), 'Could not request your ride: ' + error.message);
+  }
   window.location.replace('ride.html?id=' + data.id);
 });
 </script>
