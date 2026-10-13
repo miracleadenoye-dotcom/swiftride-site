@@ -3,25 +3,120 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SwiftRide Rider</title>
+<title>Rider Dashboard | SwiftRide</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<style>
+.toggle-card {
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 54px;
+  height: 30px;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute; cursor: pointer; inset: 0;
+  background-color: #CBD3E1;
+  transition: .3s;
+  border-radius: 30px;
+}
+.slider:before {
+  position: absolute; content: "";
+  height: 22px; width: 22px; left: 4px; bottom: 4px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+input:checked + .slider { background-color: var(--green); }
+input:checked + .slider:before { transform: translateX(24px); }
+</style>
 </head>
 <body>
 <main class="screen">
   <div class="brand"><i></i>SwiftRide Rider</div>
-  <h1 id="hi">Hi</h1>
-  <p class="sub">Welcome to the rider side</p>
-  <div class="hero"><strong style="font-size:20px">Next: your documents</strong><p>Next we add the screen where you upload your photos, licence and bike papers.</p></div>
+  
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <h1 id="riderName">Rider</h1>
+      <p class="sub" id="plateBadge" style="margin:0">Motorcycle Rider</p>
+    </div>
+    <button id="logout" class="link" type="button" style="padding:0">Log out</button>
+  </div>
+
+  <!-- ONLINE / OFFLINE TOGGLE -->
+  <div class="toggle-card">
+    <div>
+      <strong id="onlineStatus" style="font-size:16px;color:var(--mute)">You are Offline</strong>
+      <p style="margin:2px 0 0;font-size:12px;color:var(--mute)">Go online to receive ride requests</p>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="onlineToggle">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="card" style="text-align:center;padding:24px 16px">
+    <div style="font-size:32px;margin-bottom:8px">🛵</div>
+    <h2 style="font-size:16px;margin:0">Open Ride Requests</h2>
+    <p class="sub" style="font-size:13px;margin-top:4px">No active requests right now. When customers request rides in Ekiti, they will appear here.</p>
+  </div>
+
   <div class="spacer"></div>
-  <button id="out" class="link" type="button">Sign out</button>
 </main>
+
 <script type="module">
-import { requireRole, signOut } from './common.js';
+import { supabase, requireRole, signOut } from './common.js';
+
 const profile = await requireRole('rider');
-if (profile) document.getElementById('hi').textContent = 'Hi, ' + profile.full_name.split(' ')[0];
-document.getElementById('out').addEventListener('click', signOut);
+if (!profile) throw new Error('Not signed in');
+
+// Check rider verification status
+const { data: rider } = await supabase.from('riders').select('*').eq('id', profile.id).maybeSingle();
+if (!rider) {
+  window.location.replace('rider-docs.html');
+} else if (rider.status === 'pending') {
+  window.location.replace('rider-pending.html');
+} else if (rider.status === 'rejected') {
+  alert('Your application was rejected: ' + (rider.rejection_reason || 'Check documents'));
+  window.location.replace('rider-docs.html');
+}
+
+const $ = (id) => document.getElementById(id);
+$('riderName').textContent = profile.full_name;
+$('plateBadge').textContent = 'Plate: ' + (rider?.plate_number || 'N/A');
+$('logout').addEventListener('click', signOut);
+
+const toggle = $('onlineToggle');
+const statusText = $('onlineStatus');
+
+toggle.checked = !!rider?.is_online;
+updateStatusLabel(toggle.checked);
+
+function updateStatusLabel(isOnline) {
+  if (isOnline) {
+    statusText.textContent = 'You are Online';
+    statusText.style.color = '#14532D';
+  } else {
+    statusText.textContent = 'You are Offline';
+    statusText.style.color = 'var(--mute)';
+  }
+}
+
+toggle.addEventListener('change', async () => {
+  const isOnline = toggle.checked;
+  updateStatusLabel(isOnline);
+  await supabase.from('riders').update({ is_online: isOnline }).eq('id', profile.id);
+});
 </script>
 </body>
 </html>

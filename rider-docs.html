@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rider Documents | SwiftRide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+.doc-card {
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.doc-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.doc-info strong {
+  font-size: 14px;
+  color: var(--ink);
+}
+.doc-info small {
+  font-size: 12px;
+  color: var(--mute);
+}
+.doc-upload-btn {
+  height: 40px;
+  padding: 0 14px;
+  background: #EEF4FF;
+  border: 1.5px solid #CBD3E1;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.doc-upload-btn.done {
+  background: #E9F7EE;
+  border-color: var(--green);
+  color: #14532D;
+}
+.thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  display: none;
+}
+</style>
+</head>
+<body>
+<main class="screen">
+  <div class="brand"><i></i>SwiftRide Rider</div>
+  <h1>Upload your documents</h1>
+  <p class="sub">Only approved riders can go online and take rides in Ekiti.</p>
+  <p id="msg" class="msg err" hidden role="alert"></p>
+
+  <!-- PLATE NUMBER INPUT -->
+  <label style="margin-top:6px">Motorcycle Plate Number
+    <input id="plate" type="text" placeholder="e.g. ADK-123-EK" required autocomplete="off" style="text-transform:uppercase">
+  </label>
+
+  <!-- 1. FACE PHOTO -->
+  <div class="doc-card">
+    <div class="doc-info">
+      <strong>Rider Face Photo *</strong>
+      <small>Clear selfie looking directly at the camera</small>
+    </div>
+    <img id="thumbFace" class="thumb" alt="Preview">
+    <label class="doc-upload-btn" id="lblFace">
+      <span>Upload</span>
+      <input id="fileFace" type="file" accept="image/jpeg,image/png,image/webp" capture="user" hidden>
+    </label>
+  </div>
+
+  <!-- 2. BIKE PHOTO -->
+  <div class="doc-card">
+    <div class="doc-info">
+      <strong>Motorcycle Photo *</strong>
+      <small>Clear picture of your bike</small>
+    </div>
+    <img id="thumbBike" class="thumb" alt="Preview">
+    <label class="doc-upload-btn" id="lblBike">
+      <span>Upload</span>
+      <input id="fileBike" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+    </label>
+  </div>
+
+  <!-- 3. PLATE PHOTO -->
+  <div class="doc-card">
+    <div class="doc-info">
+      <strong>Plate Number Photo</strong>
+      <small>Clear close-up of the metal plate</small>
+    </div>
+    <img id="thumbPlate" class="thumb" alt="Preview">
+    <label class="doc-upload-btn" id="lblPlate">
+      <span>Upload</span>
+      <input id="filePlate" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+    </label>
+  </div>
+
+  <!-- 4. DRIVER'S LICENCE -->
+  <div class="doc-card">
+    <div class="doc-info">
+      <strong>Rider's Licence / ID</strong>
+      <small>Rider licence or National ID / NIN</small>
+    </div>
+    <img id="thumbLicence" class="thumb" alt="Preview">
+    <label class="doc-upload-btn" id="lblLicence">
+      <span>Upload</span>
+      <input id="fileLicence" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+    </label>
+  </div>
+
+  <!-- 5. BIKE PAPERS -->
+  <div class="doc-card">
+    <div class="doc-info">
+      <strong>Bike Papers / Proof of Ownership</strong>
+      <small>Registration document or purchase receipt</small>
+    </div>
+    <img id="thumbPapers" class="thumb" alt="Preview">
+    <label class="doc-upload-btn" id="lblPapers">
+      <span>Upload</span>
+      <input id="filePapers" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+    </label>
+  </div>
+
+  <div class="spacer"></div>
+  <button id="submit" class="btn" type="button">Submit for Approval</button>
+  <button id="logout" class="link" type="button">Log out</button>
+</main>
+
+<script type="module">
+import { supabase, requireRole, shrinkImage, showMessage, signOut } from './common.js';
+
+const profile = await requireRole('rider');
+if (!profile) throw new Error('Not signed in');
+
+// Check if already submitted
+const { data: existing } = await supabase.from('riders').select('*').eq('id', profile.id).maybeSingle();
+if (existing) {
+  if (existing.status === 'pending') window.location.replace('rider-pending.html');
+  else if (existing.status === 'approved') window.location.replace('rider.html');
+}
+
+const $ = (id) => document.getElementById(id);
+
+$('logout').addEventListener('click', signOut);
+
+const files = {
+  face: null,
+  bike: null,
+  plate: null,
+  licence: null,
+  papers: null
+};
+
+function handleFile(key, inputEl, thumbEl, btnEl) {
+  inputEl.addEventListener('change', () => {
+    const f = inputEl.files[0];
+    if (!f) return;
+    files[key] = f;
+    thumbEl.src = URL.createObjectURL(f);
+    thumbEl.style.display = 'block';
+    btnEl.className = 'doc-upload-btn done';
+    btnEl.querySelector('span').textContent = 'Change';
+  });
+}
+
+handleFile('face', $('fileFace'), $('thumbFace'), $('lblFace'));
+handleFile('bike', $('fileBike'), $('thumbBike'), $('lblBike'));
+handleFile('plate', $('filePlate'), $('thumbPlate'), $('lblPlate'));
+handleFile('licence', $('fileLicence'), $('thumbLicence'), $('lblLicence'));
+handleFile('papers', $('filePapers'), $('thumbPapers'), $('lblPapers'));
+
+async function uploadDoc(file, namePrefix) {
+  if (!file) return null;
+  const shrunk = await shrinkImage(file, 1000);
+  const path = `${profile.id}/${namePrefix}-${Date.now()}.jpg`;
+  const { error } = await supabase.storage.from('photos').upload(path, shrunk, {
+    contentType: 'image/jpeg',
+    upsert: true
+  });
+  if (error) throw error;
+  return path;
+}
+
+$('submit').addEventListener('click', async () => {
+  const btn = $('submit');
+  const plateText = $('plate').value.trim().toUpperCase();
+
+  if (!plateText) {
+    return showMessage($('msg'), 'Please enter your motorcycle plate number.');
+  }
+  if (!files.face) {
+    return showMessage($('msg'), 'Please upload your face photo.');
+  }
+  if (!files.bike) {
+    return showMessage($('msg'), 'Please upload a photo of your motorcycle.');
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Uploading documents...';
+  showMessage($('msg'), '');
+
+  try {
+    const facePath = await uploadDoc(files.face, 'face');
+    const bikePath = await uploadDoc(files.bike, 'bike');
+    const platePath = await uploadDoc(files.plate, 'plate');
+    const licencePath = await uploadDoc(files.licence, 'licence');
+    const papersPath = await uploadDoc(files.papers, 'papers');
+
+    const row = {
+      id: profile.id,
+      plate_number: plateText,
+      face_photo_url: facePath,
+      bike_photo_url: bikePath,
+      plate_photo_url: platePath,
+      licence_url: licencePath,
+      bike_papers_url: papersPath,
+      status: 'pending',
+      is_online: false
+    };
+
+    const { error: insErr } = await supabase.from('riders').insert(row);
+    if (insErr) throw insErr;
+
+    // Update profile avatar as well
+    if (facePath) {
+      await supabase.from('profiles').update({ photo_url: facePath }).eq('id', profile.id);
+    }
+
+    window.location.replace('rider-pending.html');
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Submit for Approval';
+    showMessage($('msg'), 'Upload failed: ' + err.message);
+  }
+});
+</script>
+</body>
+</html>
