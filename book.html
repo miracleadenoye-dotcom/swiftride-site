@@ -179,10 +179,29 @@
     <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="sub" style="margin:0">Suggested fare</span><strong id="est"></strong></div>
     <div class="stepper"><button id="minus" type="button" aria-label="Decrease offer">&minus;</button><div id="amt" class="amount" aria-live="polite"></div><button id="plus" type="button" aria-label="Increase offer">+</button></div>
     <div class="padi" aria-live="polite"><div class="pa" id="padiIcon"></div><div style="min-width:0"><div style="display:flex;align-items:center;flex-wrap:wrap"><span class="pn" id="padiName"></span><span id="padiChip" class="vc"></span></div><span id="padiText" style="font-size:15px;font-weight:600;line-height:1.35"></span></div></div>
-    <div><span class="lbl">Carrying a load?</span>
-      <div class="seg" id="loads" style="margin-top:8px"><button type="button" data-v="none" aria-pressed="true">No load</button><button type="button" data-v="small_bag" aria-pressed="false">Small bag</button><button type="button" data-v="big_load" aria-pressed="false">Big load</button></div></div>
-    <div><span class="lbl">Pay with</span>
+
+    <!-- HOW MANY PEOPLE (MAX 3) -->
+    <div><span class="lbl">How many people? (Max 3)</span>
+      <div class="seg" id="passengers" style="margin-top:8px">
+        <button type="button" data-p="1" aria-pressed="true">1 Person</button>
+        <button type="button" data-p="2" aria-pressed="false">2 People</button>
+        <button type="button" data-p="3" aria-pressed="false">3 People (Max)</button>
+      </div>
+    </div>
+
+    <!-- CARRYING A LOAD -->
+    <div style="margin-top:10px"><span class="lbl">Carrying a load?</span>
+      <div class="seg" id="loads" style="margin-top:8px">
+        <button type="button" data-v="none" aria-pressed="true">No load</button>
+        <button type="button" data-v="small_bag" aria-pressed="false">Small bag</button>
+        <button type="button" data-v="big_load" aria-pressed="false">Big load</button>
+      </div>
+    </div>
+
+    <!-- PAYMENT -->
+    <div style="margin-top:10px"><span class="lbl">Pay with</span>
       <div class="seg" style="margin-top:8px"><button type="button" aria-pressed="true">Cash</button><button type="button" disabled>Card, coming soon</button></div></div>
+    
     <div class="spacer"></div>
     <button id="request" class="btn" type="button">Request ride</button>
     <button id="back" class="link" type="button">Back</button>
@@ -312,12 +331,13 @@ let S = { base_fare: 300, price_per_km: 100, minimum_fare: 400, small_bag_extra:
 const { data: srow } = await supabase.from('settings').select('*').eq('id', 1).maybeSingle();
 if (srow) S = srow;
 
-let load = 'none', est = 0, offer = 0, edited = false, distance = 0;
+let people = 1, load = 'none', est = 0, offer = 0, edited = false, distance = 0;
 const round50 = (n) => Math.max(50, Math.round(n / 50) * 50);
 
 function estimate() {
-  const extra = load === 'small_bag' ? +S.small_bag_extra : load === 'big_load' ? +S.big_load_extra : 0;
-  return round50(Math.max(+S.minimum_fare, +S.base_fare + +S.price_per_km * distance) + extra);
+  const loadExtra = load === 'small_bag' ? +S.small_bag_extra : load === 'big_load' ? +S.big_load_extra : 0;
+  const peopleExtra = people === 2 ? 100 : people === 3 ? 200 : 0;
+  return round50(Math.max(+S.minimum_fare, +S.base_fare + +S.price_per_km * distance) + loadExtra + peopleExtra);
 }
 
 function render() {
@@ -342,7 +362,8 @@ $('next').addEventListener('click', () => {
   est = estimate();
   if (!edited) offer = est;
   
-  $('route').textContent = `${pLGA} (${pDesc}) to ${dLGA} (${dDesc}) • about ${distance.toFixed(1)} km`;
+  const pCountText = people === 1 ? '1 person' : `${people} people`;
+  $('route').textContent = `${pLGA} (${pDesc}) to ${dLGA} (${dDesc}) • ${pCountText} • about ${distance.toFixed(1)} km`;
   $('step1').hidden = true;
   $('step2').hidden = false;
   render();
@@ -366,6 +387,22 @@ $('plus').addEventListener('click', () => {
   render();
 });
 
+// Passenger count buttons (1, 2, or 3)
+document.querySelectorAll('#passengers button').forEach((b) => {
+  b.addEventListener('click', () => {
+    people = +b.dataset.p;
+    document.querySelectorAll('#passengers button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    est = estimate();
+    if (!edited) offer = est;
+    const pDesc = $('pickupDesc').value.trim() || 'Town Center';
+    const dDesc = $('destDesc').value.trim() || 'Town Center';
+    const pCountText = people === 1 ? '1 person' : `${people} people`;
+    $('route').textContent = `${$('pickupLGA').value} (${pDesc}) to ${$('destLGA').value} (${dDesc}) • ${pCountText} • about ${distance.toFixed(1)} km`;
+    render();
+  });
+});
+
+// Load buttons
 document.querySelectorAll('#loads button').forEach((b) => {
   b.addEventListener('click', () => {
     load = b.dataset.v;
@@ -386,7 +423,8 @@ $('request').addEventListener('click', async () => {
   const dLGA = $('destLGA').value;
   const dDesc = $('destDesc').value.trim() || 'Town Center';
 
-  const fullPickup = `${pLGA} (${pDesc})`.slice(0, 200);
+  const pCountTag = `[${people} ${people === 1 ? 'person' : 'passengers'}]`;
+  const fullPickup = `${pCountTag} ${pLGA} (${pDesc})`.slice(0, 200);
   const fullDest = `${dLGA} (${dDesc})`.slice(0, 200);
 
   const row = {
