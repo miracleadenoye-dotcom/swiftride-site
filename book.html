@@ -10,11 +10,17 @@
 <link rel="stylesheet" href="style.css">
 <style>
 .sug-box{position:relative}
-.sug{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--line);border-radius:12px;margin:4px 0 0;padding:6px 0;list-style:none;max-height:220px;overflow-y:auto;z-index:1000;box-shadow:0 8px 24px rgba(0,0,51,.15)}
-.sug li{padding:10px 14px;font-size:14px;font-weight:500;cursor:pointer;border-bottom:1px solid #f0f2f5;display:flex;align-items:center;gap:8px}
+.sug{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--line);border-radius:12px;margin:4px 0 0;padding:6px 0;list-style:none;max-height:240px;overflow-y:auto;z-index:1000;box-shadow:0 10px 28px rgba(0,0,51,.18)}
+.sug li{padding:10px 14px;cursor:pointer;border-bottom:1px solid #f0f2f5;display:flex;flex-direction:column;gap:2px}
 .sug li:last-child{border-bottom:none}
-.sug li:hover{background:#F5F7FB;color:var(--blue)}
-.sug li.curr{color:var(--blue);font-weight:600}
+.sug li:hover{background:#F5F7FB}
+.sug li strong{font-size:14px;color:var(--ink)}
+.sug li small{font-size:12px;color:var(--mute)}
+.sug li.curr{color:var(--blue);font-weight:600;flex-direction:row;align-items:center;padding:12px 14px;background:#EEF4FF}
+
+.loc-alert{background:#FFF3CD;border:1.5px solid #FFE69C;border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px}
+.loc-alert p{margin:0;font-size:13px;color:#664D03;font-weight:500;line-height:1.4}
+.loc-alert .btn-sm{height:36px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;align-self:flex-start;padding:0 14px}
 </style>
 </head>
 <body>
@@ -30,16 +36,22 @@
     <h1>Where to?</h1>
     <p id="msg" class="msg err" hidden role="alert"></p>
 
+    <!-- Location alert shown when GPS is off/denied -->
+    <div id="locAlert" class="loc-alert" hidden>
+      <p><strong>📍 Location access is turned off</strong><br>We couldn't detect your position automatically.</p>
+      <button id="btnManual" class="btn-sm" type="button">Enter pickup manually</button>
+    </div>
+
     <div class="sug-box">
-      <label>Pickup
-        <input id="pickup" type="text" placeholder="Search your pickup place" autocomplete="off">
+      <label>Where are you? (Pickup)
+        <input id="pickup" type="text" placeholder="Search street, area or town in Ekiti" autocomplete="off">
       </label>
       <ul id="pickupSug" class="sug" hidden></ul>
     </div>
 
     <div class="sug-box" style="margin-top:12px">
-      <label>Destination
-        <input id="dest" type="text" placeholder="Search a town, street or place in Ekiti" autocomplete="off">
+      <label>Where are you going? (Destination)
+        <input id="dest" type="text" placeholder="Search street, area or town in Ekiti" autocomplete="off">
       </label>
       <ul id="destSug" class="sug" hidden></ul>
     </div>
@@ -80,19 +92,28 @@ const CENTER = [7.72, 5.31]; // Ekiti State
 const map = L.map('map', { zoomControl: true }).setView(CENTER, 9);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
 
-const EKITI_TOWNS = [
-  { text: 'Ado-Ekiti', lat: 7.6211, lng: 5.2215 },
-  { text: 'Ikere-Ekiti', lat: 7.4981, lng: 5.2305 },
-  { text: 'Ijero-Ekiti', lat: 7.8151, lng: 5.0672 },
-  { text: 'Ikole-Ekiti', lat: 7.7983, lng: 5.5144 },
-  { text: 'Oye-Ekiti', lat: 7.7978, lng: 5.3317 },
-  { text: 'Efon-Alaaye', lat: 7.6564, lng: 4.9228 },
-  { text: 'Aramoko-Ekiti', lat: 7.7048, lng: 5.0405 },
-  { text: 'Emure-Ekiti', lat: 7.4395, lng: 5.4604 },
-  { text: 'Omuo-Ekiti', lat: 7.7583, lng: 5.7222 },
-  { text: 'Ise-Ekiti', lat: 7.4648, lng: 5.4233 },
-  { text: 'Ilawe-Ekiti', lat: 7.6006, lng: 5.1325 },
-  { text: 'Igede-Ekiti', lat: 7.6685, lng: 5.1264 }
+// Popular streets, landmarks & major towns across Ekiti State
+const EKITI_PLACES = [
+  { primary: 'Fajuyi Park', sub: 'Ado-Ekiti (City Centre)', lat: 7.6272, lng: 5.2210 },
+  { primary: 'Adebayo Road / Similoluwa', sub: 'Ado-Ekiti', lat: 7.6360, lng: 5.2340 },
+  { primary: 'EKSU Main Gate', sub: 'Iworoko Road, Ado-Ekiti', lat: 7.7130, lng: 5.2530 },
+  { primary: 'Federal Poly Ado Gate', sub: 'Ijan Road, Ado-Ekiti', lat: 7.5950, lng: 5.2850 },
+  { primary: 'FUOYE Campus', sub: 'Oye-Ekiti', lat: 7.7980, lng: 5.3280 },
+  { primary: 'Basiri / Nova Road', sub: 'Ado-Ekiti', lat: 7.6310, lng: 5.2050 },
+  { primary: 'Bank Road / Secretariat', sub: 'Ado-Ekiti', lat: 7.6250, lng: 5.2240 },
+  { primary: 'Ajilosun / Old Garage', sub: 'Ado-Ekiti', lat: 7.6080, lng: 5.2250 },
+  { primary: 'Ojumose / Atikest', sub: 'Ado-Ekiti', lat: 7.6180, lng: 5.2220 },
+  { primary: 'Irona / Ijigbo', sub: 'Ado-Ekiti', lat: 7.6150, lng: 5.2280 },
+  { primary: 'Ikere-Ekiti Central', sub: 'Ikere LGA', lat: 7.4981, lng: 5.2305 },
+  { primary: 'Ijero-Ekiti', sub: 'Ijero LGA', lat: 7.8151, lng: 5.0672 },
+  { primary: 'Ikole-Ekiti', sub: 'Ikole LGA', lat: 7.7983, lng: 5.5144 },
+  { primary: 'Ilawe-Ekiti', sub: 'Ekiti South-West LGA', lat: 7.6006, lng: 5.1325 },
+  { primary: 'Aramoko-Ekiti', sub: 'Ekiti West LGA', lat: 7.7048, lng: 5.0405 },
+  { primary: 'Omuo-Ekiti', sub: 'Ekiti East LGA', lat: 7.7583, lng: 5.7222 },
+  { primary: 'Efon-Alaaye', sub: 'Efon LGA', lat: 7.6564, lng: 4.9228 },
+  { primary: 'Ise-Ekiti', sub: 'Ise/Orun LGA', lat: 7.4648, lng: 5.4233 },
+  { primary: 'Emure-Ekiti', sub: 'Emure LGA', lat: 7.4395, lng: 5.4604 },
+  { primary: 'Igede-Ekiti', sub: 'Irepodun/Ifelodun LGA', lat: 7.6685, lng: 5.1264 }
 ];
 
 let pickup = null, dest = null, activeField = 'dest', pMark = null, dMark = null, line = null;
@@ -131,25 +152,36 @@ function setDest(p) {
   draw();
 }
 
-// Auto-request location on load
+// Location detection with clear prompt if disabled
 let userLoc = null;
 if (navigator.geolocation) {
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude, text: 'Current location' };
       setPickup(userLoc);
-      map.setView([userLoc.lat, userLoc.lng], 14);
+      map.setView([userLoc.lat, userLoc.lng], 15);
+      $('locAlert').hidden = true;
     },
-    () => { /* location refused or timed out - customer can search or tap map */ },
+    () => {
+      $('locAlert').hidden = false;
+    },
     { enableHighAccuracy: true, timeout: 8000 }
   );
+} else {
+  $('locAlert').hidden = false;
 }
+
+$('btnManual').addEventListener('click', () => {
+  $('locAlert').hidden = true;
+  activeField = 'pickup';
+  $('pickup').focus();
+});
 
 async function reverse(lat, lng) {
   try {
     const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&lat=${lat}&lon=${lng}`);
     const j = await r.json();
-    return j.display_name ? j.display_name.split(',').slice(0, 2).join(',').trim() : null;
+    return j.display_name ? j.display_name.split(',').slice(0, 2).join(', ').trim() : null;
   } catch { return null; }
 }
 
@@ -167,42 +199,46 @@ map.on('click', async (e) => {
   }
 });
 
-function renderList(ulId, items, isPickup) {
+function renderPlacesList(ulId, items, isPickup) {
   const ul = $(ulId);
   ul.innerHTML = '';
   if (isPickup) {
     const curLi = document.createElement('li');
     curLi.className = 'curr';
-    curLi.textContent = '📍 Use my current location';
+    curLi.innerHTML = '<strong>📍 Use my current location</strong>';
     curLi.addEventListener('click', () => {
       if (userLoc) {
         setPickup(userLoc);
-        map.setView([userLoc.lat, userLoc.lng], 14);
+        map.setView([userLoc.lat, userLoc.lng], 15);
       } else if (navigator.geolocation) {
-        $('pickup').value = 'Locating you...';
+        $('pickup').value = 'Detecting location...';
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude, text: 'Current location' };
             setPickup(userLoc);
-            map.setView([userLoc.lat, userLoc.lng], 14);
+            map.setView([userLoc.lat, userLoc.lng], 15);
+            $('locAlert').hidden = true;
           },
-          () => { showMessage($('msg'), 'Could not get location. Type your place instead.'); $('pickup').value = ''; },
+          () => {
+            $('locAlert').hidden = false;
+            $('pickup').value = '';
+            showMessage($('msg'), 'Location access is denied. Please type your location.');
+          },
           { enableHighAccuracy: true, timeout: 8000 }
         );
       }
     });
     ul.appendChild(curLi);
   }
+
   items.forEach((it) => {
     const li = document.createElement('li');
-    li.textContent = it.text;
+    li.innerHTML = `<strong>${it.primary}</strong><small>${it.sub}</small>`;
     li.addEventListener('click', () => {
-      if (isPickup) {
-        setPickup(it);
-      } else {
-        setDest(it);
-      }
-      map.setView([it.lat, it.lng], 14);
+      const fullText = `${it.primary}, ${it.sub}`;
+      const place = { lat: it.lat, lng: it.lng, text: fullText };
+      if (isPickup) setPickup(place); else setDest(place);
+      map.setView([it.lat, it.lng], 15);
     });
     ul.appendChild(li);
   });
@@ -212,13 +248,13 @@ function renderList(ulId, items, isPickup) {
 $('pickup').addEventListener('focus', () => {
   activeField = 'pickup';
   $('destSug').hidden = true;
-  renderList('pickupSug', EKITI_TOWNS, true);
+  renderPlacesList('pickupSug', EKITI_PLACES, true);
 });
 
 $('dest').addEventListener('focus', () => {
   activeField = 'dest';
   $('pickupSug').hidden = true;
-  renderList('destSug', EKITI_TOWNS, false);
+  renderPlacesList('destSug', EKITI_PLACES, false);
 });
 
 let pTimer, dTimer;
@@ -229,40 +265,55 @@ function setupSearch(inputEl, ulId, isPickup) {
     const q = inputEl.value.trim();
     if (isPickup) pickup = null; else dest = null;
     draw();
-    if (q.length < 3) {
-      const filtered = EKITI_TOWNS.filter(t => t.text.toLowerCase().includes(q.toLowerCase()));
-      renderList(ulId, filtered.length ? filtered : EKITI_TOWNS, isPickup);
+
+    if (q.length < 2) {
+      const filtered = EKITI_PLACES.filter(t => 
+        t.primary.toLowerCase().includes(q.toLowerCase()) || 
+        t.sub.toLowerCase().includes(q.toLowerCase())
+      );
+      renderPlacesList(ulId, filtered.length ? filtered : EKITI_PLACES, isPickup);
       return;
     }
+
     const timer = isPickup ? pTimer : dTimer;
     clearTimeout(timer);
     const newTimer = setTimeout(async () => {
       try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=ng&viewbox=4.75,8.1,5.85,7.2&q=${encodeURIComponent(q)}`;
-        const res = await (await fetch(url)).json();
+        // Search specifically biased inside Ekiti State
+        let url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=ng&viewbox=4.75,8.1,5.85,7.2&bounded=1&q=${encodeURIComponent(q)}`;
+        let res = await (await fetch(url)).json();
+        if (!res || !res.length) {
+          url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=ng&viewbox=4.75,8.1,5.85,7.2&q=${encodeURIComponent(q + ', Ekiti')}`;
+          res = await (await fetch(url)).json();
+        }
+
         ul.innerHTML = '';
-        if (!res.length) {
+        if (!res || !res.length) {
           const li = document.createElement('li');
-          li.textContent = 'No match. Try another name or tap the map.';
+          li.innerHTML = `<strong>No match found</strong><small>Try another street name or tap the map.</small>`;
           ul.appendChild(li);
         } else {
           res.forEach((it) => {
+            const parts = it.display_name.split(',').map(s => s.trim());
+            const primary = parts[0];
+            const sub = parts.slice(1, 4).join(', ');
             const li = document.createElement('li');
-            const cleanText = it.display_name.split(',').slice(0, 3).join(',');
-            li.textContent = cleanText;
+            li.innerHTML = `<strong>${primary}</strong><small>${sub}</small>`;
             li.addEventListener('click', () => {
-              const place = { lat: +it.lat, lng: +it.lon, text: cleanText };
+              const fullText = `${primary}, ${parts[1] || 'Ekiti'}`;
+              const place = { lat: +it.lat, lng: +it.lon, text: fullText };
               if (isPickup) setPickup(place); else setDest(place);
-              map.setView([place.lat, place.lng], 14);
+              map.setView([place.lat, place.lng], 15);
             });
             ul.appendChild(li);
           });
         }
         ul.hidden = false;
       } catch {
-        showMessage($('msg'), 'Search is busy. Pick from list or tap map.');
+        showMessage($('msg'), 'Search server is busy. Pick from list or tap map.');
       }
-    }, 600);
+    }, 500);
+
     if (isPickup) pTimer = newTimer; else dTimer = newTimer;
   });
 }
@@ -271,7 +322,7 @@ setupSearch($('pickup'), 'pickupSug', true);
 setupSearch($('dest'), 'destSug', false);
 
 document.addEventListener('click', (e) => {
-  if (!e.target.closest('.sug-box')) {
+  if (!e.target.closest('.sug-box') && e.target.id !== 'btnManual') {
     $('pickupSug').hidden = true;
     $('destSug').hidden = true;
   }
@@ -284,7 +335,7 @@ const { data: places } = await supabase.from('saved_places').select('*').order('
   b.type = 'button'; b.className = 'chip'; b.textContent = p.label;
   b.addEventListener('click', () => {
     setDest({ lat: p.lat, lng: p.lng, text: p.address_text });
-    map.setView([p.lat, p.lng], 14);
+    map.setView([p.lat, p.lng], 15);
   });
   $('saved').appendChild(b);
 });
