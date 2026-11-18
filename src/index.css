@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { @apply bg-slate-50 text-navy-900 antialiased; padding-bottom: env(safe-area-inset-bottom); }
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center rounded-xl px-5 py-3.5 font-semibold transition active:scale-[.98] disabled:opacity-50 min-h-[48px]; }
+  .btn-go { @apply btn bg-go-500 text-white hover:bg-go-600; }
+  .btn-navy { @apply btn bg-navy-900 text-white hover:bg-navy-800; }
+  .btn-ghost { @apply btn border-2 border-navy-900 text-navy-900 bg-white; }
+  .field { @apply w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 min-h-[48px] outline-none focus:border-navy-900; }
+  .card { @apply rounded-2xl bg-white border border-slate-200 p-4 shadow-sm; }
+  .label { @apply mb-1 block text-sm font-semibold text-navy-800; }
+}
+.leaflet-container { width: 100%; height: 100%; border-radius: 1rem; }

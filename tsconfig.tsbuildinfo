@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/guard.tsx","./src/components/shell.tsx","./src/components/ui.tsx","./src/lib/auth.tsx","./src/lib/supabase.ts","./src/pages/login.tsx","./src/pages/recover.tsx","./src/pages/signup.tsx","./src/pages/welcome.tsx","./src/pages/customer/home.tsx"],"version":"5.9.3"}
