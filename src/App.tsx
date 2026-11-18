@@ -7,6 +7,11 @@ import Guard, { RoleHome } from './components/Guard'
 import Shell from './components/Shell'
 import { configured } from './lib/supabase'
 import CustomerHome from './pages/customer/Home'
+import Setup from './pages/customer/Setup'
+import Book from './pages/customer/Book'
+import ActiveRide from './pages/customer/ActiveRide'
+import History from './pages/customer/History'
+import Profile from './pages/customer/Profile'
 
 const Soon = ({ name }: { name: string }) => (
   <div className="card"><h2 className="text-xl font-bold">{name}</h2><p className="text-slate-500">Coming in the next build step.</p></div>
@@ -53,6 +58,11 @@ export default function App() {
       <Route element={<Guard role="customer" />}>
         <Route element={<Shell title="Swift Movement" items={customerNav} />}>
           <Route path="/customer" element={<CustomerHome />} />
+          <Route path="/customer/setup" element={<Setup />} />
+          <Route path="/customer/book" element={<Book />} />
+          <Route path="/customer/ride/:id" element={<ActiveRide />} />
+          <Route path="/customer/history" element={<History />} />
+          <Route path="/customer/profile" element={<Profile />} />
           <Route path="/customer/*" element={<Soon name="Customer" />} />
         </Route>
       </Route>

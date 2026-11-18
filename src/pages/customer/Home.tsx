@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { Spinner } from '../../components/ui'
 
 export default function CustomerHome() {
+  const nav = useNavigate()
   const { session } = useAuth()
   const [name, setName] = useState<string | null>(null)
   const [padi, setPadi] = useState<string | null>(null)
@@ -15,9 +16,10 @@ export default function CustomerHome() {
     (async () => {
       const uid = session!.user.id
       const [{ data: p }, { data: a }] = await Promise.all([
-        supabase.from('profiles').select('full_name, price_padi_name').eq('id', uid).maybeSingle(),
+        supabase.from('profiles').select('full_name, price_padi_name, avatar_path').eq('id', uid).maybeSingle(),
         supabase.from('adverts').select('title, body').eq('active', true).in('audience', ['all', 'customer']).limit(1),
       ])
+      if (!p?.avatar_path || !p?.price_padi_name) { nav('/customer/setup', { replace: true }); return }
       setName(p?.full_name?.split(' ')[0] ?? null); setPadi(p?.price_padi_name ?? null); setAd(a?.[0] ?? null)
       setLoading(false)
     })()
