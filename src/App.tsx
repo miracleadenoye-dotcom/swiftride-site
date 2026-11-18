@@ -18,6 +18,14 @@ import Requests from './pages/rider/Requests'
 import Trip from './pages/rider/Trip'
 import { RiderTrips, Earnings } from './pages/rider/History'
 import RiderProfile from './pages/rider/Profile'
+import { useAuth } from './lib/auth'
+import { canSee, SECTIONS } from './lib/staff'
+import Stats from './pages/admin/Stats'
+import Users from './pages/admin/Users'
+import Verification from './pages/admin/Verification'
+import Bookings from './pages/admin/Bookings'
+import Vehicles from './pages/admin/Vehicles'
+import Settings from './pages/admin/Settings'
 
 const Soon = ({ name }: { name: string }) => (
   <div className="card"><h2 className="text-xl font-bold">{name}</h2><p className="text-slate-500">Coming in the next build step.</p></div>
@@ -37,15 +45,19 @@ const riderNav = [
   { to: '/rider/earnings', label: 'Earnings', icon: '💰' },
   { to: '/rider/profile', label: 'Profile', icon: '👤' },
 ]
-const adminNav = [
-  { to: '/admin', label: 'Stats', icon: '📊' },
-  { to: '/admin/users', label: 'Users', icon: '👥' },
-  { to: '/admin/verification', label: 'Verify', icon: '✅' },
-  { to: '/admin/bookings', label: 'Bookings', icon: '📋' },
-  { to: '/admin/settings', label: 'Settings', icon: '⚙️' },
-]
+const adminNavAll = [
+  { to: '/admin', label: 'Stats', icon: '📊', section: 'stats' },
+  { to: '/admin/users', label: 'Users', icon: '👥', section: 'users' },
+  { to: '/admin/verification', label: 'Verify', icon: '✅', section: 'verification' },
+  { to: '/admin/bookings', label: 'Bookings', icon: '📋', section: 'bookings' },
+  { to: '/admin/vehicles', label: 'Vehicles', icon: '🛵', section: 'vehicles' },
+  { to: '/admin/settings', label: 'Settings', icon: '⚙️', section: 'settings' },
+] as const
 
 export default function App() {
+  const { staffRole } = useAuth()
+  const adminNav = adminNavAll.filter(i => canSee(staffRole, i.section))
+  const only = (s: keyof typeof SECTIONS, el: JSX.Element) => canSee(staffRole, s) ? el : <Navigate to="/admin" replace />
   if (!configured) return (
     <main className="mx-auto max-w-md p-8">
       <h1 className="text-2xl font-bold">Setup needed</h1>
@@ -88,7 +100,13 @@ export default function App() {
 
       <Route element={<Guard role="staff" />}>
         <Route element={<Shell title="Swift Admin" items={adminNav} />}>
-          <Route path="/admin/*" element={<Soon name="Admin" />} />
+          <Route path="/admin" element={only('stats', <Stats />)} />
+          <Route path="/admin/users" element={only('users', <Users />)} />
+          <Route path="/admin/verification" element={only('verification', <Verification />)} />
+          <Route path="/admin/bookings" element={only('bookings', <Bookings />)} />
+          <Route path="/admin/vehicles" element={only('vehicles', <Vehicles />)} />
+          <Route path="/admin/settings" element={only('settings', <Settings />)} />
+          <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
         </Route>
       </Route>
 
