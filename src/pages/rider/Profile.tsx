@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { uploadPhoto, useSignedUrl } from '../../lib/photos'
@@ -46,6 +47,11 @@ export default function RiderProfile() {
       <Field label="Plate number"><input className="field" value={plate} onChange={e => setPlate(e.target.value)} /></Field>
       {msg && <p className="font-semibold text-go-600">{msg}</p>}
       <ErrorBox msg={err} />
+      <div className="grid grid-cols-3 gap-2">
+        <Link to="/rider/safety" className="btn-ghost">🛡️ Safety</Link>
+        <Link to="/rider/support" className="btn-ghost">💬 Support</Link>
+        <Link to="/rider/notifications" className="btn-ghost">🔔 Alerts</Link>
+      </div>
       <button className="btn-go w-full" onClick={save}>Save</button>
       <button className="btn-ghost w-full" onClick={signOut}>Log out</button>
     </div>

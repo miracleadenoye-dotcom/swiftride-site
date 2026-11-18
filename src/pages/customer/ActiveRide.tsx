@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
+import RateAndBlock from '../../components/RateAndBlock'
 import { supabase } from '../../lib/supabase'
 import { RIDE_COLS, naira, type Ride } from '../../lib/db'
 import { useAuth } from '../../lib/auth'
@@ -60,8 +62,38 @@ export default function ActiveRide() {
           <p className="text-4xl font-extrabold tracking-[0.4em]">{pin}</p>
         </div>
       )}
+      {ride.status === 'ongoing' && <PaymentCode />}
+      {(ride.status === 'accepted' || ride.status === 'ongoing') && <Emergency />}
+      {ride.status === 'completed' && <RateAndBlock rideId={ride.id} otherId={ride.rider_id} otherLabel="rider" />}
       {active && ride.status !== 'ongoing' && <button className="btn-ghost w-full" onClick={cancel}>Cancel ride</button>}
       {!active && <button className="btn-navy w-full" onClick={() => nav('/customer')}>Back home</button>}
+    </div>
+  )
+}
+
+/** The rider scans this QR (or types the code) to confirm payment. Fraud protection: it only works for the assigned rider. */
+function PaymentCode() {
+  const { session } = useAuth()
+  const uid = session!.user.id
+  return (
+    <div className="card flex flex-col items-center gap-2">
+      <p className="font-bold">Payment QR</p>
+      <QRCodeSVG value={uid} size={140} />
+      <p className="text-sm text-slate-500">Or tell your rider this code: <b className="tracking-widest">{uid.replace(/-/g, '').slice(0, 8).toUpperCase()}</b></p>
+    </div>
+  )
+}
+
+function Emergency() {
+  const { session } = useAuth()
+  const [c, setC] = useState<{ id: string; name: string; phone: string }[]>([])
+  useEffect(() => { supabase.from('emergency_contacts').select('id, name, phone').eq('user_id', session!.user.id).then(({ data }) => setC(data ?? [])) }, [session])
+  return (
+    <div className="card space-y-2">
+      <p className="font-bold">Emergency</p>
+      <a href="tel:112" className="btn bg-red-600 text-white">Call 112</a>
+      {c.map(x => <a key={x.id} href={`tel:${x.phone}`} className="btn-ghost">Call {x.name}</a>)}
+      {c.length === 0 && <Link to="/customer/safety" className="text-sm underline">Add emergency contacts</Link>}
     </div>
   )
 }

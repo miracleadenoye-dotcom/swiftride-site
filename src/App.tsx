@@ -26,6 +26,12 @@ import Verification from './pages/admin/Verification'
 import Bookings from './pages/admin/Bookings'
 import Vehicles from './pages/admin/Vehicles'
 import Settings from './pages/admin/Settings'
+import Tickets from './pages/admin/Tickets'
+import Wallet from './pages/customer/Wallet'
+import Budget from './pages/customer/Budget'
+import Notifications from './pages/Notifications'
+import Safety from './pages/Safety'
+import Support from './pages/Support'
 
 const Soon = ({ name }: { name: string }) => (
   <div className="card"><h2 className="text-xl font-bold">{name}</h2><p className="text-slate-500">Coming in the next build step.</p></div>
@@ -51,6 +57,7 @@ const adminNavAll = [
   { to: '/admin/verification', label: 'Verify', icon: '✅', section: 'verification' },
   { to: '/admin/bookings', label: 'Bookings', icon: '📋', section: 'bookings' },
   { to: '/admin/vehicles', label: 'Vehicles', icon: '🛵', section: 'vehicles' },
+  { to: '/admin/tickets', label: 'Tickets', icon: '💬', section: 'tickets' },
   { to: '/admin/settings', label: 'Settings', icon: '⚙️', section: 'settings' },
 ] as const
 
@@ -74,19 +81,24 @@ export default function App() {
       <Route path="/app" element={<RoleHome />} />
 
       <Route element={<Guard role="customer" />}>
-        <Route element={<Shell title="Swift Movement" items={customerNav} />}>
+        <Route element={<Shell title="Swift Movement" items={customerNav} notifPath="/customer/notifications" />}>
           <Route path="/customer" element={<CustomerHome />} />
           <Route path="/customer/setup" element={<Setup />} />
           <Route path="/customer/book" element={<Book />} />
           <Route path="/customer/ride/:id" element={<ActiveRide />} />
           <Route path="/customer/history" element={<History />} />
           <Route path="/customer/profile" element={<Profile />} />
+          <Route path="/customer/wallet" element={<Wallet />} />
+          <Route path="/customer/budget" element={<Budget />} />
+          <Route path="/customer/notifications" element={<Notifications />} />
+          <Route path="/customer/safety" element={<Safety />} />
+          <Route path="/customer/support" element={<Support />} />
           <Route path="/customer/*" element={<Soon name="Customer" />} />
         </Route>
       </Route>
 
       <Route element={<Guard role="rider" />}>
-        <Route element={<Shell title="Swift Rider" items={riderNav} />}>
+        <Route element={<Shell title="Swift Rider" items={riderNav} notifPath="/rider/notifications" />}>
           <Route path="/rider" element={<RiderHome />} />
           <Route path="/rider/onboarding" element={<Onboarding />} />
           <Route path="/rider/requests" element={<Requests />} />
@@ -94,6 +106,9 @@ export default function App() {
           <Route path="/rider/trips" element={<RiderTrips />} />
           <Route path="/rider/earnings" element={<Earnings />} />
           <Route path="/rider/profile" element={<RiderProfile />} />
+          <Route path="/rider/notifications" element={<Notifications />} />
+          <Route path="/rider/safety" element={<Safety />} />
+          <Route path="/rider/support" element={<Support />} />
           <Route path="/rider/*" element={<Soon name="Rider" />} />
         </Route>
       </Route>
@@ -105,6 +120,7 @@ export default function App() {
           <Route path="/admin/verification" element={only('verification', <Verification />)} />
           <Route path="/admin/bookings" element={only('bookings', <Bookings />)} />
           <Route path="/admin/vehicles" element={only('vehicles', <Vehicles />)} />
+          <Route path="/admin/tickets" element={only('tickets', <Tickets />)} />
           <Route path="/admin/settings" element={only('settings', <Settings />)} />
           <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
         </Route>

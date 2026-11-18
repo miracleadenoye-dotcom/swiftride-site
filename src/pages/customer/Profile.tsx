@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useSignedUrl, uploadPhoto } from '../../lib/photos'
@@ -38,6 +39,12 @@ export default function Profile() {
       <Field label="Price Padi name"><input className="field" value={p.price_padi_name ?? ''} maxLength={30} onChange={e => setP({ ...p, price_padi_name: e.target.value })} /></Field>
       {msg && <p className="font-semibold text-go-600">{msg}</p>}
       <ErrorBox msg={err} />
+      <div className="grid grid-cols-2 gap-2">
+        <Link to="/customer/budget" className="btn-ghost">💼 Budget</Link>
+        <Link to="/customer/safety" className="btn-ghost">🛡️ Safety</Link>
+        <Link to="/customer/support" className="btn-ghost">💬 Support</Link>
+        <Link to="/customer/notifications" className="btn-ghost">🔔 Alerts</Link>
+      </div>
       <button className="btn-go w-full" onClick={save}>Save</button>
       <button className="btn-ghost w-full" onClick={signOut}>Log out</button>
     </div>

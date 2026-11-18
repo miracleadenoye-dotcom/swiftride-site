@@ -6,6 +6,7 @@ export const SECTIONS: Record<string, string[]> = {
   verification: ['verification'],
   bookings: ['support', 'finance'],
   vehicles: ['support'],
+  tickets: ['support'],
   settings: ['support', 'finance'],
 }
 export const canSee = (staffRole: string | null, section: keyof typeof SECTIONS) =>
