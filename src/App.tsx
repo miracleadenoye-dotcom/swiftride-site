@@ -12,6 +12,12 @@ import Book from './pages/customer/Book'
 import ActiveRide from './pages/customer/ActiveRide'
 import History from './pages/customer/History'
 import Profile from './pages/customer/Profile'
+import RiderHome from './pages/rider/Home'
+import Onboarding from './pages/rider/Onboarding'
+import Requests from './pages/rider/Requests'
+import Trip from './pages/rider/Trip'
+import { RiderTrips, Earnings } from './pages/rider/History'
+import RiderProfile from './pages/rider/Profile'
 
 const Soon = ({ name }: { name: string }) => (
   <div className="card"><h2 className="text-xl font-bold">{name}</h2><p className="text-slate-500">Coming in the next build step.</p></div>
@@ -69,6 +75,13 @@ export default function App() {
 
       <Route element={<Guard role="rider" />}>
         <Route element={<Shell title="Swift Rider" items={riderNav} />}>
+          <Route path="/rider" element={<RiderHome />} />
+          <Route path="/rider/onboarding" element={<Onboarding />} />
+          <Route path="/rider/requests" element={<Requests />} />
+          <Route path="/rider/trip/:id" element={<Trip />} />
+          <Route path="/rider/trips" element={<RiderTrips />} />
+          <Route path="/rider/earnings" element={<Earnings />} />
+          <Route path="/rider/profile" element={<RiderProfile />} />
           <Route path="/rider/*" element={<Soon name="Rider" />} />
         </Route>
       </Route>

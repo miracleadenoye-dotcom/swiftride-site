@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { RIDE_COLS, naira, type Ride } from '../../lib/db'
-import Map from '../../components/Map'
+import { useAuth } from '../../lib/auth'
+import { useShareLocation } from '../../lib/useShareLocation'
+import Map, { type Pt } from '../../components/Map'
 import { Spinner } from '../../components/ui'
 
 const label: Record<string, string> = { pending: 'Waiting for a rider…', accepted: 'Rider is on the way', ongoing: 'Trip in progress', completed: 'Trip completed', cancelled: 'Cancelled' }
@@ -10,6 +12,8 @@ const label: Record<string, string> = { pending: 'Waiting for a rider…', accep
 export default function ActiveRide() {
   const { id } = useParams()
   const nav = useNavigate()
+  const { session } = useAuth()
+  const [live, setLive] = useState<Pt | null>(null)
   const [ride, setRide] = useState<Ride | null>(null)
   const [pin, setPin] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -24,9 +28,14 @@ export default function ActiveRide() {
     supabase.from('ride_pins').select('pin').eq('ride_id', id!).maybeSingle().then(({ data }) => alive && setPin(data?.pin ?? null))
     const ch = supabase.channel(`ride-${id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${id}` }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ride_locations', filter: `ride_id=eq.${id}` },
+        (p: { new: { user_id?: string; lat?: number; lng?: number } }) => {
+          if (p.new?.user_id && p.new.user_id !== session?.user.id && p.new.lat != null && p.new.lng != null) setLive({ lat: p.new.lat, lng: p.new.lng })
+        })
       .subscribe()
     return () => { alive = false; void supabase.removeChannel(ch) }
-  }, [id])
+  }, [id, session])
+  useShareLocation(id, ride?.status === 'accepted' || ride?.status === 'ongoing')
 
   async function cancel() {
     if (!confirm('Cancel this ride?')) return
@@ -39,7 +48,7 @@ export default function ActiveRide() {
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <h1 className="text-2xl font-extrabold">{label[ride.status]}</h1>
-      <Map from={{ lat: ride.pickup_lat, lng: ride.pickup_lng }} to={{ lat: ride.dest_lat, lng: ride.dest_lng }} />
+      <Map from={{ lat: ride.pickup_lat, lng: ride.pickup_lng }} to={{ lat: ride.dest_lat, lng: ride.dest_lng }} live={live} />
       <div className="card space-y-1">
         <p><b>From:</b> {ride.pickup_name}</p>
         <p><b>To:</b> {ride.dest_name}</p>
